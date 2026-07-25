@@ -1,14 +1,19 @@
 "use client";
+import { useState } from "react";
 import Navbar from "@/components/landing/Navbar";
 import Type from "@/components/landing/Type";
 import Footer from "@/components/landing/Footer";
+import RegisterForm from "@/components/landing/RegisterForm";
+import LoginForm from "@/components/landing/LoginForm";
 
 const Home = () => {
+  const [regVisible, setRegVisible] = useState(false);
+  const [logVisible, setLogVisible] = useState(false);
   return (
     <main className="min-h-screen overflow-hidden bg-gradient-to-br from-[#0b1020] via-[#151b3b] to-[#1c2942] text-white">
-      <Navbar />
+      <Navbar onReg={()=> setRegVisible(true)} onLog={()=> setLogVisible(true)}/>
       {/* Hero Section */}
-      <section className="relative mx-auto grid grid-cols-1 lg:grid-cols-2 place-items-center min-h-screen max-w-7xl px-6 pt-24 py-auto">
+      <section className="relative mx-auto grid grid-cols-1 gap-4 mb-4 lg:grid-cols-2 place-items-center min-h-screen max-w-7xl px-6 pt-24 py-auto">
         <div className="absolute left-[-100px] top-[-100px] h-[400px] w-[400px] rounded-full bg-violet-600/20 blur-3xl" />
 
         {/* Left */}
@@ -25,7 +30,7 @@ const Home = () => {
             and organize workflows inside one unified productivity ecosystem.
           </p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-            <button className="rounded-2xl bg-violet-600 px-8 py-4 font-semibold transition-all duration-300 hover:scale-105 hover:bg-violet-500">
+            <button className="rounded-2xl bg-violet-600 px-8 py-4 font-semibold transition-all duration-300 hover:scale-105 hover:bg-violet-500" onClick={()=> setRegVisible(true)}>
               Start Free
             </button>
 
@@ -94,6 +99,16 @@ const Home = () => {
             teams.
           </p>
         </div>
+        {regVisible && (
+            <div className="fixed inset-0 z-10 flex items-center justify-center bg-zinc-900/60" >
+              <RegisterForm  onClose={() => setRegVisible(false)}/>
+            </div>
+          )}
+        {logVisible && (
+            <div className="fixed inset-0 z-10 flex items-center justify-center bg-zinc-900/60" >
+              <LoginForm  onClose={() => setLogVisible(false)}/>
+            </div>
+          )}
       </section>
       <Footer />
     </main>

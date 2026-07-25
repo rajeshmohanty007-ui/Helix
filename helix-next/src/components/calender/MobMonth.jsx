@@ -1,20 +1,14 @@
 import React, { useState } from "react";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import AddIcon from "@mui/icons-material/Add";
 
-export default function MobMonth() {
+export default function MobMonth({
+  events = [],
+  tasks = [],
+  selectedDate,
+  onSelectDate,
+}) {
   const [currentDate, setCurrentDate] = useState(new Date());
-
-  // Mock event structure mapping 'YYYY-MM-DD' strings to an array of events
-  const [events, setEvents] = useState({
-    "2026-06-03": [
-      { id: 1, title: "Project Demo" },
-      { id: 2, title: "Team Sync" },
-    ],
-    "2026-06-15": [{ id: 3, title: "Code Review" }],
-    "2026-06-22": [{ id: 4, title: "Launch Day" }],
-  });
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -60,15 +54,37 @@ export default function MobMonth() {
     );
   };
 
-  // Quick helper to safely add a dummy event to a day
-  const handleAddEvent = (dayString) => {
-    const title = prompt("Enter event title:");
-    if (!title) return;
+  const formatDateString = (dateInput) => {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "";
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
 
-    setEvents((prev) => ({
-      ...prev,
-      [dayString]: [...(prev[dayString] || []), { id: Date.now(), title }],
-    }));
+  // Check if a day has any unfinished task deadline
+  const isUnfinishedTaskDeadlineOnDay = (dayString) => {
+    return tasks.some((task) => {
+      if (task.completed) return false;
+      if (!task.deadline || task.deadline === "No deadline") return false;
+
+      if (task.deadline === dayString) return true;
+
+      try {
+        const deadlineDate = new Date(task.deadline);
+        if (isNaN(deadlineDate.getTime())) return false;
+
+        const targetDate = new Date(dayString + "T00:00:00");
+        return (
+          deadlineDate.getFullYear() === targetDate.getFullYear() &&
+          deadlineDate.getMonth() === targetDate.getMonth() &&
+          deadlineDate.getDate() === targetDate.getDate()
+        );
+      } catch {
+        return false;
+      }
+    });
   };
 
   return (
@@ -82,7 +98,7 @@ export default function MobMonth() {
           <ChevronLeftIcon className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]" />
         </button>
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
+          <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
             {monthNames[month]}{" "}
             <span className="font-normal text-[var(--text-secondary)]">
               {year}
@@ -119,48 +135,59 @@ export default function MobMonth() {
         {/* Actual Date Tiles */}
         {Array.from({ length: totalDays }).map((_, index) => {
           const day = index + 1;
-
           const dayString = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-          const dayEvents = events[dayString] || [];
+          const dayEvents = events.filter(
+            (e) => formatDateString(e.date) === dayString
+          );
+          const eventCount = dayEvents.length;
 
-          const workload = dayEvents.length;
-
+          // Heatmap intensity for mobile background
           const intensityClass =
-            workload === 0
+            eventCount === 0
               ? "bg-[var(--bg-main)]"
-              : workload === 1
-                ? "bg-yellow-400/25"
-                : workload === 2
-                  ? "bg-yellow-400/50"
-                  : workload === 3
-                    ? "bg-orange-400/50"
-                    : workload === 4
-                      ? "bg-orange-500/70"
-                      : workload === 5
-                        ? "bg-red-500/70"
-                        : "bg-red-600";
+              : eventCount <= 2
+                ? "bg-[var(--accent)]/10"
+                : eventCount <= 4
+                  ? "bg-[var(--accent)]/25"
+                  : "bg-[var(--accent)]/45" ;
+
+          const hasUnfinishedDeadline = isUnfinishedTaskDeadlineOnDay(dayString);
+          const isSelected = selectedDate === dayString;
 
           return (
             <button
               key={day}
-              className={`relative aspect-square rounded-xl transition-all duration-200 ${intensityClass} ${
+              onClick={() => onSelectDate(dayString)}
+              className={`relative aspect-square rounded-xl flex flex-col justify-between p-1.5 transition-all duration-200 ${intensityClass} ${
                 isToday(day) ? "ring-2 ring-[var(--accent)]" : ""
-              } `}
+              } ${isSelected ? "ring-2 ring-[var(--accent)] scale-[1.03]" : ""}`}
             >
-              {/* Date Number */}
-              <span
-                className={`absolute top-2 left-2 text-xs font-medium ${
-                  workload >= 5 ? "text-white" : "text-[var(--text-primary)]"
-                } `}
-              >
-                {day}
-              </span>
+              {/* Date Number and red dot */}
+              <div className="flex items-center justify-between w-full">
+                <span className="text-xs font-medium text-[var(--text-primary)]">
+                  {day}
+                </span>
 
-              {/* Deadline Dot */}
-              {workload >= 5 && (
-                <div className="absolute right-2 bottom-2 h-2 w-2 rounded-full bg-red-500" />
-              )}
+                {hasUnfinishedDeadline && (
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-sm border border-[var(--bg-card)]"
+                    title="Unfinished task deadline"
+                  />
+                )}
+              </div>
+
+              {/* Mobile Workload Progress Bar */}
+              <div className="w-full mt-auto">
+                <div className="h-1 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/20">
+                  <div
+                    className="h-full rounded-full bg-[var(--accent)] transition-all"
+                    style={{
+                      width: `${Math.min(eventCount * 25, 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
             </button>
           );
         })}

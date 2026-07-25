@@ -7,6 +7,8 @@ import ObjectivesSec from "@/components/projects/ObjectivesSec";
 import UpdatesSec from "@/components/projects/UpdatesSec";
 import SeeMore from "@/components/ui/SeeMore";
 import MobileNav from "@/components/layouts/MobileNav";
+import AddUpdateModal from "@/components/projects/AddUpdateModal";
+import AddObjectiveModal from "@/components/projects/AddObjectiveModal";
 
 import { dummyChats } from "./dumChats";
 import {
@@ -15,19 +17,15 @@ import {
   KeyboardDoubleArrowLeft,
   KeyboardDoubleArrowRight,
 } from "@mui/icons-material";
+import CircularProgress from "@mui/material/CircularProgress";
 
 const ProjectSide = ({
   collapsed,
   setCollapsed,
   activeProj,
   setActiveProj,
+  projects = [],
 }) => {
-  const projects = [
-    { id: 1, name: "Helix", status: "active" },
-    { id: 2, name: "Portfolio", status: "active" },
-    { id: 3, name: "Game Engine", status: "paused" },
-  ];
-
   return (
     <aside
       className={`absolute flex flex-col top-0 left-0 z-25 h-full rounded-r-4xl border-r border-(--border-color) bg-(--bg-sidebar) transition-all duration-300 lg:relative ${collapsed ? "w-16" : "w-72"} `}
@@ -72,10 +70,10 @@ const ProjectSide = ({
         {projects.map((project) => (
           <button
             key={project.id}
-            className={`relative flex w-full items-center gap-3 px-3 py-3 text-left transition ${!collapsed && activeProj === project.name ? "rounded-xl bg-(--accent) text-white" : ""} ${activeProj !== project.name ? "rounded-xl hover:bg-(--bg-hover)" : ""}`}
-            onClick={() => setActiveProj(project.name)}
+            className={`relative flex w-full items-center gap-3 px-3 py-3 text-left transition ${!collapsed && activeProj?.id === project.id ? "rounded-xl bg-(--accent) text-white" : ""} ${activeProj?.id !== project.id ? "rounded-xl hover:bg-(--bg-hover)" : ""}`}
+            onClick={() => setActiveProj(project)}
           >
-            {collapsed && activeProj === project.name && (
+            {collapsed && activeProj?.id === project.id && (
               <span className="absolute top-0 left-0 h-full w-0.5 bg-(--accent)" />
             )}
             {/* Status Dot */}
@@ -106,18 +104,89 @@ export default function ProjectsPage() {
     setMounted(true);
   }, []);
 
+  const [projects, setProjects] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [activeProj, setActiveProj] = useState(null);
+
+  const [updates, setUpdates] = useState([]);
+  const [updatesLoading, setUpdatesLoading] = useState(false);
+  const [objectives, setObjectives] = useState([]);
+  const [objectivesLoading, setObjectivesLoading] = useState(false);
+
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [isObjectiveModalOpen, setIsObjectiveModalOpen] = useState(false);
+
   const [mobileTab, setMobileTab] = useState("updates");
   const [projColl, setProjColl] = useState(true);
-  const [activeProj, setActiveProj] = useState(() => {
-    const saved = localStorage.getItem("activeProj");
-    return saved ? saved : "";
-  });
+  
   const [leftWidth, setLeftWidth] = useState(33);
   const [middleWidth, setMiddleWidth] = useState(34);
 
+  // Fetch projects
   useEffect(() => {
-    localStorage.setItem("activeProj", activeProj);
+    if (!mounted) return;
+    fetch("/api/projects")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setProjects(data);
+          
+          const savedProjId = localStorage.getItem("activeProjId");
+          let initialProj = null;
+          if (savedProjId) {
+            initialProj = data.find((p) => p.id === savedProjId);
+          }
+          if (!initialProj && data.length > 0) {
+            initialProj = data[0];
+          }
+          setActiveProj(initialProj);
+        }
+      })
+      .catch((err) => console.error("Error loading projects:", err))
+      .finally(() => setProjectsLoading(false));
+  }, [mounted]);
+
+  // Sync activeProj selection to localstorage
+  useEffect(() => {
+    if (activeProj?.id) {
+      localStorage.setItem("activeProjId", activeProj.id);
+    }
   }, [activeProj]);
+
+  // Load updates & objectives when activeProj changes
+  useEffect(() => {
+    if (!activeProj?.id) return;
+
+    setUpdatesLoading(true);
+    fetch(`/api/projects/${activeProj.id}/updates`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setUpdates(data);
+        }
+      })
+      .catch((err) => console.error("Error fetching updates:", err))
+      .finally(() => setUpdatesLoading(false));
+
+    setObjectivesLoading(true);
+    fetch(`/api/projects/${activeProj.id}/objectives`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setObjectives(data);
+        }
+      })
+      .catch((err) => console.error("Error fetching objectives:", err))
+      .finally(() => setObjectivesLoading(false));
+  }, [activeProj?.id]);
+
+  const handleUpdateAdded = (newUpdate) => {
+    setUpdates((prev) => [newUpdate, ...prev]);
+  };
+
+  const handleObjectiveAdded = (newObjective) => {
+    setObjectives((prev) => [newObjective, ...prev]);
+  };
 
   const containerRef = useRef(null);
 
@@ -155,166 +224,197 @@ export default function ProjectsPage() {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", stop);
   };
-  return <div className="relative flex h-full flex-1">
-          <ProjectSide
-            collapsed={projColl}
-            setCollapsed={setProjColl}
-            activeProj={activeProj}
-            setActiveProj={setActiveProj}
-          />
-          {!projColl && (
+
+  return (
+    <div className="relative flex h-full flex-1">
+      <ProjectSide
+        collapsed={projColl}
+        setCollapsed={setProjColl}
+        activeProj={activeProj}
+        setActiveProj={setActiveProj}
+        projects={projects}
+      />
+      {!projColl && (
+        <div
+          className="fixed inset-0 z-19 bg-black/40 lg:hidden"
+          onClick={() => setProjColl(true)}
+        />
+      )}
+      <div className="ml-16 flex min-h-0 flex-1 flex-col p-2 lg:ml-0">
+        <h1 className="w-full p-4 text-center text-2xl font-bold text-(--accent)">
+          {projectsLoading ? "Loading..." : (activeProj?.name || "Select a Project")}
+        </h1>
+        <div
+          ref={containerRef}
+          className="flex min-h-0 flex-1 rounded-t-2xl border border-(--border-color) backdrop-blur-lg"
+        >
+          <div className="hidden h-full w-full lg:flex">
+            {/* Updates Section */}
             <div
-              className="fixed inset-0 z-19 bg-black/40 lg:hidden"
-              onClick={() => setProjColl(true)}
-            />
-          )}
-          <div className="ml-16 flex min-h-0 flex-1 flex-col p-2 lg:ml-0">
-            <h1 className="w-full p-4 text-center text-2xl font-bold text-(--accent)">
-              {activeProj}
-            </h1>
-            <div
-              ref={containerRef}
-              className="flex min-h-0 flex-1 rounded-t-2xl border border-(--border-color) backdrop-blur-lg"
+              style={{ width: `${leftWidth}%` }}
+              className="flex h-full min-w-0 flex-col"
             >
-              <div className="hidden h-full w-full lg:flex">
-                <div
-                  style={{ width: `${leftWidth}%` }}
-                  className="flex h-full min-w-0 flex-col"
-                >
-                  <h1 className="sticky top-0 w-full p-2 text-center text-lg font-semibold text-(--accent)">
-                    Updates
-                  </h1>
-                  <button className="m-1 rounded-lg bg-(--accent) p-2 text-white">
-                    Add an Update
-                  </button>
-                  <div className="helix-scroll min-h-0 flex-1 overflow-y-auto p-2">
-                    <div className="flex flex-col gap-2">
-                      <Card3
-                        profile=""
-                        username="Rajesh"
-                        action="completed"
-                        timestamp="5 minutes ago"
-                        content="Implemented JWT authentication and protected routes."
-                      />
-                      <Card3
-                        profile="https://i.pravatar.cc/100?img=8"
-                        username="Aman"
-                        action="started"
-                        timestamp="20 minutes ago"
-                        content="Started building the real-time chat system."
-                      />
-                      <Card3
-                        profile="https://i.pravatar.cc/100?img=11"
-                        username="Sarah"
-                        action="blocked"
-                        timestamp="1 hour ago"
-                        content="Waiting for database migration approval."
-                      />
-                      <Card3
-                        profile="https://i.pravatar.cc/100?img=15"
-                        username="John"
-                        action="updated"
-                        timestamp="2 hours ago"
-                        content="Updated the project roadmap and sprint goals."
-                      />
-                    </div>
-                    <div className="flex justify-center py-2">
-                      <SeeMore />
-                    </div>
+              <h1 className="sticky top-0 w-full p-2 text-center text-lg font-semibold text-(--accent)">
+                Updates
+              </h1>
+              <button
+                onClick={() => activeProj && setIsUpdateModalOpen(true)}
+                disabled={!activeProj}
+                className="m-1 rounded-lg bg-(--accent) p-2 text-white hover:opacity-90 disabled:opacity-50 transition active:scale-98"
+              >
+                Add an Update
+              </button>
+              <div className="helix-scroll min-h-0 flex-1 overflow-y-auto p-2">
+                {updatesLoading ? (
+                  <div className="flex justify-center p-4">
+                    <CircularProgress size={24} />
                   </div>
-                </div>
-                <div
-                  className="group relative w-2 cursor-col-resize"
-                  onMouseDown={(e) => startResize(e, "left")}
-                >
-                  <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-(--border-color) group-hover:bg-(--accent)" />
-                </div>
-                <div
-                  style={{ width: `${middleWidth}%` }}
-                  className="flex h-full min-w-0 flex-col"
-                >
-                  <h1 className="sticky top-0 w-full p-2 text-center text-lg font-semibold text-(--accent)">
-                    Objectives
-                  </h1>
-                  <button className="m-1 rounded-lg bg-(--accent) p-2 text-white">
-                    Add an Objective
-                  </button>
-                  <div className="helix-scroll min-h-0 flex-1 overflow-y-auto p-2">
-                    <div className="flex flex-col gap-2">
-                      <Card4
-                        title="Complete Authentication System"
-                        deadline="June 15, 2026"
-                        status="progress"
-                        members={[
-                          {
-                            name: "Rajesh",
-                            avatar: "https://i.pravatar.cc/100?img=5",
-                          },
-                          {
-                            name: "Aman",
-                            avatar: "https://i.pravatar.cc/100?img=8",
-                          },
-                        ]}
+                ) : updates.length === 0 ? (
+                  <p className="text-center text-sm text-[var(--text-secondary)] py-8">
+                    No updates yet.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {updates.map((update) => (
+                      <Card3
+                        key={update.id}
+                        profile={`https://api.dicebear.com/7.x/initials/svg?seed=${update.user.username}`}
+                        username={update.user.username}
+                        action={update.action}
+                        timestamp={
+                          new Date(update.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }) +
+                          " - " +
+                          new Date(update.createdAt).toLocaleDateString()
+                        }
+                        content={update.content}
                       />
-                      <Card4
-                        title="Launch Beta Version"
-                        deadline="July 1, 2026"
-                        status="pending"
-                        members={[
-                          {
-                            name: "Sarah",
-                            avatar: "https://i.pravatar.cc/100?img=11",
-                          },
-                        ]}
-                      />
-                      <Card4
-                        title="Real-time Chat Module"
-                        deadline="June 10, 2026"
-                        status="blocked"
-                        members={[
-                          {
-                            name: "John",
-                            avatar: "https://i.pravatar.cc/100?img=15",
-                          },
-                          {
-                            name: "Rajesh",
-                            avatar: "https://i.pravatar.cc/100?img=5",
-                          },
-                        ]}
-                      />
-                    </div>
+                    ))}
                   </div>
-                </div>
-                <div
-                  className="group relative w-2 cursor-col-resize"
-                  onMouseDown={(e) => startResize(e, "middle")}
-                >
-                  <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-(--border-color) group-hover:bg-(--accent)" />
-                </div>
-                <div
-                  className="flex h-full min-w-0 flex-col"
-                  style={{ width: `${100 - middleWidth - leftWidth}%` }}
-                >
-                  <h1 className="sticky top-0 w-full p-2 text-center text-lg font-semibold text-(--accent)">
-                    Chats
-                  </h1>
-                  <div className="min-h-0 min-w-0 flex-1">
-                    <Chats data={dummyChats} />
-                  </div>
+                )}
+                <div className="flex justify-center py-2">
+                  <SeeMore />
                 </div>
               </div>
-              <div className="flex h-full w-full flex-col lg:hidden">
-                <div className="min-h-0 flex-1">
-                  {mobileTab === "updates" && <UpdatesSec />}
+            </div>
+            
+            <div
+              className="group relative w-2 cursor-col-resize"
+              onMouseDown={(e) => startResize(e, "left")}
+            >
+              <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-(--border-color) group-hover:bg-(--accent)" />
+            </div>
 
-                  {mobileTab === "objectives" && <ObjectivesSec />}
+            {/* Objectives Section */}
+            <div
+              style={{ width: `${middleWidth}%` }}
+              className="flex h-full min-w-0 flex-col"
+            >
+              <h1 className="sticky top-0 w-full p-2 text-center text-lg font-semibold text-(--accent)">
+                Objectives
+              </h1>
+              <button
+                onClick={() => activeProj && setIsObjectiveModalOpen(true)}
+                disabled={!activeProj}
+                className="m-1 rounded-lg bg-(--accent) p-2 text-white hover:opacity-90 disabled:opacity-50 transition active:scale-98"
+              >
+                Add an Objective
+              </button>
+              <div className="helix-scroll min-h-0 flex-1 overflow-y-auto p-2">
+                {objectivesLoading ? (
+                  <div className="flex justify-center p-4">
+                    <CircularProgress size={24} />
+                  </div>
+                ) : objectives.length === 0 ? (
+                  <p className="text-center text-sm text-[var(--text-secondary)] py-8">
+                    No objectives yet.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {objectives.map((obj) => (
+                      <Card4
+                        key={obj.id}
+                        title={obj.title}
+                        deadline={obj.deadline}
+                        status={obj.status}
+                        members={obj.members.map((m) => ({
+                          name: m.username,
+                          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${m.username}`,
+                        }))}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
 
-                  {mobileTab === "chats" && <Chats data={dummyChats} />}
-                </div>
+            <div
+              className="group relative w-2 cursor-col-resize"
+              onMouseDown={(e) => startResize(e, "middle")}
+            >
+              <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-(--border-color) group-hover:bg-(--accent)" />
+            </div>
 
-                <MobileNav active={mobileTab} setActive={setMobileTab} />
+            {/* Chats Section */}
+            <div
+              className="flex h-full min-w-0 flex-col"
+              style={{ width: `${100 - middleWidth - leftWidth}%` }}
+            >
+              <h1 className="sticky top-0 w-full p-2 text-center text-lg font-semibold text-(--accent)">
+                Chats
+              </h1>
+              <div className="min-h-0 min-w-0 flex-1">
+                <Chats data={dummyChats} activeProj={activeProj} />
               </div>
             </div>
           </div>
-        </div>;
+
+          {/* Mobile View */}
+          <div className="flex h-full w-full flex-col lg:hidden">
+            <div className="min-h-0 flex-1">
+              {mobileTab === "updates" && (
+                <UpdatesSec
+                  updates={updates}
+                  loading={updatesLoading}
+                  onAddClick={() => activeProj && setIsUpdateModalOpen(true)}
+                />
+              )}
+
+              {mobileTab === "objectives" && (
+                <ObjectivesSec
+                  objectives={objectives}
+                  loading={objectivesLoading}
+                  onAddClick={() => activeProj && setIsObjectiveModalOpen(true)}
+                />
+              )}
+
+              {mobileTab === "chats" && <Chats data={dummyChats} />}
+            </div>
+
+            <MobileNav active={mobileTab} setActive={setMobileTab} />
+          </div>
+        </div>
+      </div>
+
+      {/* Forms Modals */}
+      {activeProj && (
+        <>
+          <AddUpdateModal
+            isOpen={isUpdateModalOpen}
+            onClose={() => setIsUpdateModalOpen(false)}
+            projectId={activeProj.id}
+            onUpdateAdded={handleUpdateAdded}
+          />
+          <AddObjectiveModal
+            isOpen={isObjectiveModalOpen}
+            onClose={() => setIsObjectiveModalOpen(false)}
+            projectId={activeProj.id}
+            onObjectiveAdded={handleObjectiveAdded}
+          />
+        </>
+      )}
+    </div>
+  );
 }

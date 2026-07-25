@@ -1,8 +1,9 @@
 import OpenInFullIcon from "@mui/icons-material/OpenInFull";
 import TagIcon from "@mui/icons-material/Tag";
 import CircleIcon from "@mui/icons-material/Circle";
+import Link from "next/link";
 
-const Chats = ({ data }) => {
+const Chats = ({ data, activeProj }) => {
   return (
     <div className="flex h-full w-full overflow-hidden">
       {/* Sidebar */}
@@ -59,9 +60,19 @@ const Chats = ({ data }) => {
             # {data.activeChat.name}
           </h2>
 
-          <button className="rounded-md p-1 transition hover:bg-(--bg-hover)">
-            <OpenInFullIcon fontSize="small" />
-          </button>
+          {activeProj?.id ? (
+            <Link
+              href={`/projects/${activeProj.id}/chat`}
+              target="_blank"
+              className="rounded-md p-1 transition hover:bg-(--bg-hover) flex items-center justify-center"
+            >
+              <OpenInFullIcon fontSize="small" />
+            </Link>
+          ) : (
+            <button className="rounded-md p-1 transition hover:bg-(--bg-hover) opacity-50 cursor-not-allowed" disabled>
+              <OpenInFullIcon fontSize="small" />
+            </button>
+          )}
         </header>
 
         <div className="flex-1 space-y-3 overflow-y-auto p-3">

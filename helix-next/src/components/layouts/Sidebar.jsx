@@ -12,7 +12,7 @@ import AccountCircleRoundedIcon from "@mui/icons-material/AccountCircleRounded";
 import Btn1 from "../ui/Btn1";
 import ThemeToggle from "./ThemeToggle";
 
-const Sidebar = ({ collapsed, setCollapsed, sec }) => {
+const Sidebar = ({ collapsed, setCollapsed, sec, onProfileClick }) => {
   const [btn, setBtn] = useState(sec);
   const { dark, toggleTheme } = useTheme();
   return (
@@ -73,12 +73,18 @@ const Sidebar = ({ collapsed, setCollapsed, sec }) => {
           }}
         />
       </div>
-      <div className="absolute bottom-0 left-0 z-51 flex w-full items-center gap-4 border-t border-t-(--border-color) bg-(--bg-main) p-2">
-        <SettingsRoundedIcon />
-        {!collapsed && (
-          <ThemeToggle />
-        )}
-        {!collapsed && <AccountCircleRoundedIcon />}
+      <div className={`absolute bottom-0 left-0 z-51 flex w-full border-t border-[var(--border-color)] bg-[var(--bg-main)] transition-all duration-300 ${collapsed ? "flex-col items-center gap-4 py-4 px-2" : "items-center justify-between p-3"}`}>
+        <div className="flex items-center gap-2">
+          <SettingsRoundedIcon className="cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]" />
+          {!collapsed && <ThemeToggle />}
+        </div>
+        <button
+          onClick={onProfileClick}
+          type="button"
+          className="flex items-center justify-center rounded-full p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition"
+        >
+          <AccountCircleRoundedIcon />
+        </button>
       </div>
     </div>
   );

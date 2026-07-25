@@ -162,12 +162,10 @@ export default function ChatPage({ params }) {
     if (!currentUser?.id) return;
 
     let socket;
-    const socketInitializer = async () => {
-      // Trigger API socket connection
-      await fetch("/api/socket");
-
-      socket = io({
-        path: "/api/socket",
+    const socketInitializer = () => {
+      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
+      socket = io(socketUrl, {
+        transports: ["websocket"],
       });
 
       socketRef.current = socket;

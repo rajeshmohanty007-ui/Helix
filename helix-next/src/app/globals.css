@@ -62,7 +62,7 @@ body {
   animation-delay: var(--delay);
 }
 
-:root {
+html {
   --bg-main: #f8fafc;
   --bg-sidebar: #ffffff;
   --bg-card: #ffffff;
@@ -77,7 +77,7 @@ body {
   --accent: #7c3aed;
 }
 
-:root.dark {
+html.dark {
   --bg-main: #0f172a;
   --bg-sidebar: #111827;
   --bg-card: #1e293b;

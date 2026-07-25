@@ -3,18 +3,14 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import AddIcon from "@mui/icons-material/Add";
 
-export default function MonthCalendar() {
+export default function MonthCalendar({
+  events = [],
+  tasks = [],
+  selectedDate,
+  onSelectDate,
+  onAddEvent,
+}) {
   const [currentDate, setCurrentDate] = useState(new Date());
-
-  // Mock event structure mapping 'YYYY-MM-DD' strings to an array of events
-  const [events, setEvents] = useState({
-    "2026-06-03": [
-      { id: 1, title: "Project Demo" },
-      { id: 2, title: "Team Sync" },
-    ],
-    "2026-06-15": [{ id: 3, title: "Code Review" }],
-    "2026-06-22": [{ id: 4, title: "Launch Day" }],
-  });
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -60,15 +56,37 @@ export default function MonthCalendar() {
     );
   };
 
-  // Quick helper to safely add a dummy event to a day
-  const handleAddEvent = (dayString) => {
-    const title = prompt("Enter event title:");
-    if (!title) return;
+  const formatDateString = (dateInput) => {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "";
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
 
-    setEvents((prev) => ({
-      ...prev,
-      [dayString]: [...(prev[dayString] || []), { id: Date.now(), title }],
-    }));
+  // Check if a day has any unfinished task deadline
+  const isUnfinishedTaskDeadlineOnDay = (dayString) => {
+    return tasks.some((task) => {
+      if (task.completed) return false;
+      if (!task.deadline || task.deadline === "No deadline") return false;
+
+      if (task.deadline === dayString) return true;
+
+      try {
+        const deadlineDate = new Date(task.deadline);
+        if (isNaN(deadlineDate.getTime())) return false;
+
+        const targetDate = new Date(dayString + "T00:00:00");
+        return (
+          deadlineDate.getFullYear() === targetDate.getFullYear() &&
+          deadlineDate.getMonth() === targetDate.getMonth() &&
+          deadlineDate.getDate() === targetDate.getDate()
+        );
+      } catch {
+        return false;
+      }
+    });
   };
 
   return (
@@ -119,67 +137,97 @@ export default function MonthCalendar() {
         {/* Actual Date Tiles */}
         {Array.from({ length: totalDays }).map((_, index) => {
           const day = index + 1;
-
           const dayString = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-          const dayEvents = events[dayString] || [];
-
-          // Heatmap intensity
+          const dayEvents = events.filter(
+            (e) => formatDateString(e.date) === dayString
+          );
           const eventCount = dayEvents.length;
 
+          // Heatmap intensity based on event count
           const intensityClass =
             eventCount === 0
-              ? "bg-[var(--bg-main)]"
+              ? "bg-[var(--bg-main)] hover:bg-[var(--bg-hover)]"
               : eventCount <= 2
-                ? "bg-[var(--accent)]/15"
+                ? "bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20"
                 : eventCount <= 4
-                  ? "bg-[var(--accent)]/35"
+                  ? "bg-[var(--accent)]/25 hover:bg-[var(--accent)]/35"
                   : eventCount <= 6
-                    ? "bg-[var(--accent)]/55"
-                    : "bg-[var(--accent)]/80";
+                    ? "bg-[var(--accent)]/45 hover:bg-[var(--accent)]/55"
+                    : "bg-[var(--accent)]/70 hover:bg-[var(--accent)]/80 text-white";
 
-          // Example urgent condition
-          const isUrgent = eventCount >= 5;
+          const hasUnfinishedDeadline = isUnfinishedTaskDeadlineOnDay(dayString);
+          const isSelected = selectedDate === dayString;
 
           return (
             <button
               key={day}
+              onClick={() => onSelectDate(dayString)}
               className={`group relative flex aspect-square flex-col rounded-2xl p-2 transition-all duration-200 ${intensityClass} ${
                 isToday(day)
                   ? "border-[var(--accent)] border-2 ring-1 ring-[var(--accent)]"
                   : "border border-[var(--border-color)] hover:scale-[1.03]"
-              }`}
+              } ${isSelected ? "ring-2 ring-[var(--accent)] scale-[1.03]" : ""}`}
             >
-              {/* Date */}
-              <div className="flex items-start justify-between">
+              {/* Date & Action Row */}
+              <div className="flex items-start justify-between w-full">
                 <span
                   className={`text-sm font-semibold 2xl:text-lg ${
                     isToday(day)
                       ? "text-[var(--accent)]"
-                      : "text-[var(--text-primary)]"
+                      : eventCount > 6
+                        ? "text-white"
+                        : "text-[var(--text-primary)]"
                   }`}
                 >
                   {day}
                 </span>
 
-                {isUrgent && <span className="animate-pulse text-xs">⚠</span>}
+                <div className="flex items-center gap-1.5">
+                  {/* Red dot for unfinished task deadlines */}
+                  {hasUnfinishedDeadline && (
+                    <span
+                      className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-md border border-[var(--bg-card)]"
+                      title="Unfinished task deadline"
+                    />
+                  )}
+
+                  {/* Add event mini-button */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectDate(dayString);
+                      onAddEvent();
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                    title="Add event"
+                  >
+                    <AddIcon sx={{ fontSize: 16 }} />
+                  </div>
+                </div>
               </div>
 
-              {/* Workload Bar */}
-              <div className="mt-auto">
-                <div className="h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+              {/* Workload Progress Bar */}
+              <div className="mt-auto w-full">
+                <div className="h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/15">
                   <div
-                    className="h-full rounded-full bg-[var(--accent)] transition-all"
+                    className={`h-full rounded-full transition-all ${
+                      eventCount > 6 ? "bg-white" : "bg-[var(--accent)]"
+                    }`}
                     style={{
-                      width: `${Math.min(eventCount * 20, 100)}%`,
+                      width: `${Math.min(eventCount * 25, 100)}%`,
                     }}
                   />
                 </div>
 
-                <div className="mt-1 text-center text-[10px] text-[var(--text-secondary)]">
+                <div
+                  className={`mt-1 text-left text-[10px] font-medium ${
+                    eventCount > 6 ? "text-white/80" : "text-[var(--text-secondary)]"
+                  }`}
+                >
                   {eventCount === 0
                     ? "Free"
-                    : `${eventCount} task${eventCount > 1 ? "s" : ""}`}
+                    : `${eventCount} event${eventCount > 1 ? "s" : ""}`}
                 </div>
               </div>
             </button>

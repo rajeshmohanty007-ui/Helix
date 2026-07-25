@@ -8,7 +8,7 @@ export const config = {
   },
 };
 
-export default function SocketHandler(req, res) {
+export default async function SocketHandler(req, res) {
   if (res.socket.server.io) {
     console.log("Socket is already running");
     res.end();
@@ -23,6 +23,36 @@ export default function SocketHandler(req, res) {
       origin: "*",
     },
   });
+
+  // Setup Redis Adapter for multi-instance sync (e.g. Vercel)
+  const redisUrl = process.env.REDIS_URL;
+  if (redisUrl) {
+    try {
+      const { createAdapter } = await import("@socket.io/redis-adapter");
+      const { createClient } = await import("redis");
+
+      const pubClient = createClient({
+        url: redisUrl,
+        socket: {
+          reconnectStrategy: (retries) => {
+            if (retries >= 3) return false;
+            return 1000; // Retry after 1 second
+          }
+        }
+      });
+      const subClient = pubClient.duplicate();
+
+      pubClient.on("error", (err) => console.warn("Socket.io Redis PubClient error:", err.message));
+      subClient.on("error", (err) => console.warn("Socket.io Redis SubClient error:", err.message));
+
+      await Promise.all([pubClient.connect(), subClient.connect()]);
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log("Socket.io Redis adapter connected successfully");
+    } catch (adapterErr) {
+      console.warn("Failed to initialize Socket.io Redis adapter. Falling back to local adapter:", adapterErr.message);
+    }
+  }
+
   res.socket.server.io = io;
 
   io.on("connection", (socket) => {
