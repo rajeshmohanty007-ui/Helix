@@ -1,0 +1,153 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+
+  username     String   @unique
+  email        String   @unique
+
+  passwordHash String
+
+  role         String   @default("member")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  updates           ProjectUpdate[]
+  createdMessages   Message[]
+  tasks             Task[]
+  createdEvents     CalendarEvent[]    @relation("EventCreator")
+  assignedEvents    CalendarEvent[]    @relation("EventAssignees")
+  projects          Project[]          @relation("ProjectMembers")
+  objectives        ProjectObjective[] @relation("ObjectiveMembers")
+}
+
+model Project {
+  id         String   @id @default(cuid())
+  name       String
+  status     String   @default("active") // "active", "paused"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relationships
+  members    User[]             @relation("ProjectMembers")
+  updates    ProjectUpdate[]
+  objectives ProjectObjective[]
+  channels   Channel[]
+}
+
+model ProjectUpdate {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   @default("updated") // "completed", "started", "blocked", "updated"
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model ProjectObjective {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  deadline  String
+  status    String   @default("pending") // "completed", "progress", "pending", "blocked"
+  createdAt DateTime @default(now())
+
+  // Relationships
+  members   User[]   @relation("ObjectiveMembers")
+}
+
+model Channel {
+  id        String   @id @default(cuid())
+  name      String
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status    String   @default("active") // "active", "waiting", "blocked", "completed"
+  type      String   @default("general") // "general", "objective", "bug", "sprint", "ideas", "announcements"
+  createdAt DateTime @default(now())
+
+  // Relationships
+  messages  Message[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  text      String
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  pinned    Boolean  @default(false)
+  important Boolean  @default(false)
+  decision  Boolean  @default(false)
+  reactions String?  // Stringified JSON, e.g. {"👍": ["userId1"]}
+  replyTo   String?  // Stringified JSON representing parent quote metadata
+  system    Boolean  @default(false)
+  progress  Int?     // Progress bar percentage for system logs
+  createdAt DateTime @default(now())
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  priority    String    @default("Medium") // "High", "Medium", "Low"
+  deadline    String
+  duration    String    @default("0 hrs")
+  completed   Boolean   @default(false)
+  taskList    String    @default("Daily") // "Daily", "College", "Freelance"
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relationships
+  subtasks    Subtask[]
+  tags        Tag[]     @relation("TaskTags")
+}
+
+model Subtask {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title     String
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  tasks     Task[]   @relation("TaskTags")
+}
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  startTime   String
+  endTime     String
+  date        DateTime @default(now())
+  type        String   @default("task") // "task", "deadline", "meeting", "focus"
+  priority    String   @default("medium") // "low", "medium", "high"
+  status      String   @default("pending") // "completed", "in-progress", "pending"
+  
+  // Relations
+  creatorId   String
+  creator     User     @relation("EventCreator", fields: [creatorId], references: [id])
+  assignees   User[]   @relation("EventAssignees")
+}
