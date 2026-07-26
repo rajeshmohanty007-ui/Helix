@@ -1,7 +1,10 @@
+import { useState } from "react";
 import Card3 from "../ui/Card3";
 import CircularProgress from "@mui/material/CircularProgress";
+import SeeMore from "../ui/SeeMore";
 
 const UpdatesSec = ({ updates = [], loading = false, onAddClick }) => {
+  const [limit, setLimit] = useState(5);
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-(--border-color) p-2">
@@ -27,25 +30,32 @@ const UpdatesSec = ({ updates = [], loading = false, onAddClick }) => {
             No updates yet.
           </p>
         ) : (
-          <div className="flex flex-col gap-2">
-            {updates.map((update) => (
-              <Card3
-                key={update.id}
-                profile={`https://api.dicebear.com/7.x/initials/svg?seed=${update.user.username}`}
-                username={update.user.username}
-                action={update.action}
-                timestamp={
-                  new Date(update.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }) +
-                  " - " +
-                  new Date(update.createdAt).toLocaleDateString()
-                }
-                content={update.content}
-              />
-            ))}
-          </div>
+          <>
+            <div className="flex flex-col gap-2">
+              {updates.slice(0, limit).map((update) => (
+                <Card3
+                  key={update.id}
+                  profile={`https://api.dicebear.com/7.x/initials/svg?seed=${update.user.username}`}
+                  username={update.user.username}
+                  action={update.action}
+                  timestamp={
+                    new Date(update.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }) +
+                    " - " +
+                    new Date(update.createdAt).toLocaleDateString()
+                  }
+                  content={update.content}
+                />
+              ))}
+            </div>
+            {updates.length > limit && (
+              <div className="flex justify-center py-2 mt-2">
+                <SeeMore onClick={() => setLimit((prev) => prev + 5)} />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

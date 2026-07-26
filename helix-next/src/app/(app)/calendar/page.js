@@ -50,6 +50,10 @@ export default function CalendarPage() {
     (event) => formatDateString(event.date) === selectedDate
   );
 
+  useEffect(() => {
+    document.title = "Calendar | Helix";
+  }, []);
+
   return (
     <div className="h-full min-h-0 flex-1 relative">
       {/* Desktop view */}

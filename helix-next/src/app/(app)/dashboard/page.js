@@ -5,7 +5,7 @@ import Card1 from "@/components/ui/Card1";
 import FolderIcon from "@mui/icons-material/Folder";
 import Activity from "@/components/ui/Activity";
 import Card2 from "@/components/ui/Card2";
-import CircularProgress from "@mui/material/CircularProgress";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 import { formatDate, formatElapsed } from "@/ScriptFunc/dashboard";
 
 export default function DashboardPage() {
@@ -25,14 +25,14 @@ export default function DashboardPage() {
       });
   }, []);
 
+  useEffect(() => {
+    document.title = "Dashboard | Helix";
+  }, []);
+
 
 
   if (loading) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-(--bg-main)">
-        <CircularProgress size={40} className="text-(--accent)" />
-      </div>
-    );
+    return <LoadingScreen fullScreen={true} />;
   }
 
   if (!data) {

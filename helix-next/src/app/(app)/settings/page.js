@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useTheme } from "@/context/ThemeContext";
-import CircularProgress from "@mui/material/CircularProgress";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 
 import SettingsSidebar from "@/components/settings/SettingsSidebar";
@@ -56,12 +56,12 @@ export default function SettingsPage() {
     fetchProfile();
   }, [status]);
 
+  useEffect(() => {
+    document.title = "Settings | Helix";
+  }, []);
+
   if (loading || status === "loading" || !mounted) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-(--bg-main)">
-        <CircularProgress size={40} className="text-(--accent)" />
-      </div>
-    );
+    return <LoadingScreen fullScreen={true} />;
   }
 
   return (

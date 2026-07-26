@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import CircularProgress from "@mui/material/CircularProgress";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import DeleteSweepRoundedIcon from "@mui/icons-material/DeleteSweepRounded";
@@ -115,12 +115,12 @@ export default function NotificationsPage() {
     return true;
   });
 
+  useEffect(() => {
+    document.title = "Notifications | Helix";
+  }, []);
+
   if (loading || status === "loading") {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-(--bg-main)">
-        <CircularProgress size={40} className="text-(--accent)" />
-      </div>
-    );
+    return <LoadingScreen fullScreen={true} />;
   }
 
   const chips = [

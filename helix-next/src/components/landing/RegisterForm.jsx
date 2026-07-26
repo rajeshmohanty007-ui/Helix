@@ -88,7 +88,7 @@ export default function RegisterForm({ onClose }) {
             name="username"
             required
             autoComplete="off"
-            placeholder="Rajesh"
+            placeholder="Enter your username"
             className="w-full rounded-xl border border-[var(--border-color)] bg-transparent px-4 py-3 outline-none transition focus:border-[var(--accent)] text-[var(--text-secondary)]"
           />
         </div>
@@ -103,7 +103,7 @@ export default function RegisterForm({ onClose }) {
             name="email"
             required
             autoComplete="off"
-            placeholder="rajesh@example.com"
+            placeholder="Enter your email address"
             className="w-full rounded-xl border border-[var(--border-color)] bg-transparent px-4 py-3 outline-none transition focus:border-[var(--accent)] text-[var(--text-secondary)]"
           />
         </div>

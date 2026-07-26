@@ -142,3 +142,17 @@ html.font-size-medium {
 html.font-size-large {
   font-size: 18px;
 }
+
+/* Branded Loading Progress Animation */
+@keyframes progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.animate-progress {
+  animation: progress-slide 1.5s infinite ease-in-out;
+}

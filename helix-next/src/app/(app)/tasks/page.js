@@ -128,6 +128,14 @@ export default function TasksPage() {
     await deleteList(listName, activeTaskList, setActiveTaskList, taskLists, setTaskLists);
   };
 
+  useEffect(() => {
+    if (activeTaskList) {
+      document.title = `${activeTaskList} Tasks | Helix`;
+    } else {
+      document.title = "Tasks | Helix";
+    }
+  }, [activeTaskList]);
+
   return (
     <div className="h-full flex-1 overflow-y-auto p-4">
       <div className="flex h-full flex-col gap-2 overflow-hidden rounded-2xl border border-(--border-color) bg-(--bg-main) p-4 shadow-md">

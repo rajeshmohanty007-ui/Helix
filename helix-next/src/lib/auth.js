@@ -45,6 +45,8 @@ export const authOptions = {
 
   session: {
     strategy: "jwt",
+    maxAge: 7 * 24 * 60 * 60, // 1 week
+    updateAge: 24 * 60 * 60, // Recycle/extend session max age every 24 hours
   },
 
   callbacks: {

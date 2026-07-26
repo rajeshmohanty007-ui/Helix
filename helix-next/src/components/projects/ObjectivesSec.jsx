@@ -1,7 +1,10 @@
+import { useState } from "react";
 import Card4 from "../ui/Card4";
 import CircularProgress from "@mui/material/CircularProgress";
+import SeeMore from "../ui/SeeMore";
 
 const ObjectivesSec = ({ objectives = [], loading = false, onAddClick }) => {
+  const [limit, setLimit] = useState(5);
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-(--border-color) p-2">
@@ -27,20 +30,27 @@ const ObjectivesSec = ({ objectives = [], loading = false, onAddClick }) => {
             No objectives yet.
           </p>
         ) : (
-          <div className="flex flex-col gap-2">
-            {objectives.map((obj) => (
-              <Card4
-                key={obj.id}
-                title={obj.title}
-                deadline={obj.deadline}
-                status={obj.status}
-                members={obj.members.map((m) => ({
-                  name: m.username,
-                  avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${m.username}`,
-                }))}
-              />
-            ))}
-          </div>
+          <>
+            <div className="flex flex-col gap-2">
+              {objectives.slice(0, limit).map((obj) => (
+                <Card4
+                  key={obj.id}
+                  title={obj.title}
+                  deadline={obj.deadline}
+                  status={obj.status}
+                  members={obj.members.map((m) => ({
+                    name: m.username,
+                    avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${m.username}`,
+                  }))}
+                />
+              ))}
+            </div>
+            {objectives.length > limit && (
+              <div className="flex justify-center py-2 mt-2">
+                <SeeMore onClick={() => setLimit((prev) => prev + 5)} />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

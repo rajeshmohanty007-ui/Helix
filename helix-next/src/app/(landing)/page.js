@@ -1,14 +1,34 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/landing/Navbar";
 import Type from "@/components/landing/Type";
 import Footer from "@/components/landing/Footer";
 import RegisterForm from "@/components/landing/RegisterForm";
 import LoginForm from "@/components/landing/LoginForm";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 
 const Home = () => {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [regVisible, setRegVisible] = useState(false);
   const [logVisible, setLogVisible] = useState(false);
+
+  useEffect(() => {
+    document.title = "Helix | Collaboration Reimagined";
+  }, []);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/dashboard");
+    }
+  }, [status, router]);
+
+  if (status === "loading" || status === "authenticated") {
+    return <LoadingScreen fullScreen={true} />;
+  }
+
   return (
     <main className="min-h-screen overflow-hidden bg-gradient-to-br from-[#0b1020] via-[#151b3b] to-[#1c2942] text-white">
       <Navbar onReg={()=> setRegVisible(true)} onLog={()=> setLogVisible(true)}/>

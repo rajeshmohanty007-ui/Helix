@@ -6,7 +6,7 @@ import { io } from "socket.io-client";
 import TopicsSidebar from "@/components/chatRoom/TopicsSidebar";
 import ChatArea from "@/components/chatRoom/ChatArea";
 import WorkspaceContextSidebar from "@/components/chatRoom/WorkspaceContextSidebar";
-import CircularProgress from "@mui/material/CircularProgress";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 
 export default function ChatPage({ params }) {
   const resolvedParams = use(params);
@@ -371,12 +371,20 @@ export default function ChatPage({ params }) {
     }
   };
 
+  useEffect(() => {
+    if (project?.name) {
+      if (activeTopic) {
+        document.title = `#${activeTopic.name || activeTopic.title} - ${project.name} | Helix`;
+      } else {
+        document.title = `${project.name} Chat | Helix`;
+      }
+    } else {
+      document.title = "Discussion & Chat | Helix";
+    }
+  }, [project?.name, activeTopic]);
+
   if (loading || status === "loading") {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-(--bg-main)">
-        <CircularProgress size={40} className="text-(--accent)" />
-      </div>
-    );
+    return <LoadingScreen fullScreen={true} />;
   }
 
   return (

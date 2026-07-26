@@ -5,7 +5,7 @@ import { useDialog } from "@/components/providers/DialogProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import CircularProgress from "@mui/material/CircularProgress";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
@@ -199,12 +199,16 @@ export default function ProjectSettingsPage({ params }) {
     }
   };
 
+  useEffect(() => {
+    if (project?.name) {
+      document.title = `${project.name} - Settings | Helix`;
+    } else {
+      document.title = "Project Settings | Helix";
+    }
+  }, [project?.name]);
+
   if (loading || status === "loading") {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-(--bg-main)">
-        <CircularProgress size={40} className="text-(--accent)" />
-      </div>
-    );
+    return <LoadingScreen fullScreen={true} />;
   }
 
   // Sidebar link items

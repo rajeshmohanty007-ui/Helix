@@ -30,6 +30,9 @@ export default function ProjectsPage() {
   const [objectives, setObjectives] = useState([]);
   const [objectivesLoading, setObjectivesLoading] = useState(false);
 
+  const [updatesLimit, setUpdatesLimit] = useState(5);
+  const [objectivesLimit, setObjectivesLimit] = useState(5);
+
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isObjectiveModalOpen, setIsObjectiveModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -74,6 +77,9 @@ export default function ProjectsPage() {
   // Load updates & objectives when activeProj changes
   useEffect(() => {
     if (!activeProj?.id) return;
+
+    setUpdatesLimit(5);
+    setObjectivesLimit(5);
 
     setUpdatesLoading(true);
     fetch(`/api/projects/${activeProj.id}/updates`)
@@ -148,6 +154,10 @@ export default function ProjectsPage() {
     window.addEventListener("mouseup", stop);
   };
 
+  useEffect(() => {
+    document.title = "Projects | Helix";
+  }, []);
+
   return (
     <div className="relative flex h-full flex-1">
       <ProjectSidebar
@@ -199,7 +209,7 @@ export default function ProjectsPage() {
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {updates.map((update) => (
+                    {updates.slice(0, updatesLimit).map((update) => (
                       <Card3
                         key={update.id}
                         profile={`https://api.dicebear.com/7.x/initials/svg?seed=${update.user.username}`}
@@ -218,9 +228,11 @@ export default function ProjectsPage() {
                     ))}
                   </div>
                 )}
-                <div className="flex justify-center py-2">
-                  <SeeMore />
-                </div>
+                {updates.length > updatesLimit && (
+                  <div className="flex justify-center py-2 mt-2">
+                    <SeeMore onClick={() => setUpdatesLimit((prev) => prev + 5)} />
+                  </div>
+                )}
               </div>
             </div>
             
@@ -257,7 +269,7 @@ export default function ProjectsPage() {
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {objectives.map((obj) => (
+                    {objectives.slice(0, objectivesLimit).map((obj) => (
                       <Card4
                         key={obj.id}
                         title={obj.title}
@@ -269,6 +281,11 @@ export default function ProjectsPage() {
                         }))}
                       />
                     ))}
+                  </div>
+                )}
+                {objectives.length > objectivesLimit && (
+                  <div className="flex justify-center py-2 mt-2">
+                    <SeeMore onClick={() => setObjectivesLimit((prev) => prev + 5)} />
                   </div>
                 )}
               </div>
