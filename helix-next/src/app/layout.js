@@ -2,6 +2,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/providers/ToastProvider";
 import { DialogProvider } from "@/components/providers/DialogProvider";
+import AuthProvider from "@/components/providers/AuthProvider";
 
 export const metadata = {
   title: {
@@ -42,13 +43,15 @@ export default function RootLayout({ children }) {
       lang="en"
     >
       <body>
-        <ThemeProvider>
-          <ToastProvider>
-            <DialogProvider>
-              {children}
-            </DialogProvider>
-          </ToastProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              <DialogProvider>
+                {children}
+              </DialogProvider>
+            </ToastProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );
