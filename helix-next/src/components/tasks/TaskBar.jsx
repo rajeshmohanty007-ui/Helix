@@ -1,4 +1,3 @@
-import { useState } from "react";
 import TaskCard from "./TaskCard";
 
 const TaskBar = ({
@@ -8,8 +7,8 @@ const TaskBar = ({
   onAddTaskClick,
   onToggleTask,
   onDeleteTask,
+  className,
 }) => {
-  const [expandedTask, setExpandedTask] = useState(null);
 
   const sortedTasks = [...tasks].sort((a, b) => {
     if (a.completed === b.completed) return 0;
@@ -17,7 +16,7 @@ const TaskBar = ({
   });
 
   return (
-    <aside className="flex h-full w-full min-w-[280px] flex-col border-r border-[var(--border-color)] md:w-[40%]">
+    <aside className={`flex h-full w-full min-w-[280px] flex-col border-r-0 md:border-r border-[var(--border-color)] md:w-[40%] ${className || ""}`}>
       <div className="helix-scroll flex-1 overflow-y-auto p-2">
         <div className="flex flex-col gap-2">
           {sortedTasks.length === 0 ? (
@@ -32,8 +31,6 @@ const TaskBar = ({
                 <TaskCard
                   task={task}
                   selected={activeTask?.id === task.id}
-                  expandedTask={expandedTask}
-                  setExpandedTask={setExpandedTask}
                   onToggleTask={onToggleTask}
                   onDeleteTask={onDeleteTask}
                 />

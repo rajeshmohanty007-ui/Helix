@@ -38,14 +38,25 @@ export default function AppShell({ children }) {
   }, [sideColl]);
 
   const isChatPage = /^\/projects\/[^/]+\/chat$/.test(pathname || "");
+  const isProjectSettingsPage = /^\/projects\/[^/]+\/settings$/.test(pathname || "");
+  const isMainSettingsPage = pathname === "/settings";
+  const isSidebarHidden = isChatPage || isProjectSettingsPage || isMainSettingsPage;
   const currentLink = links.find(link => link.href === pathname);
-  const currentTitle = isChatPage ? "Project Chat" : (currentLink?.title || "Dashboard");
-  const currentSec = isChatPage ? "proj" : (currentLink?.sec || "Home");
+  const currentTitle = isChatPage 
+    ? "Project Chat" 
+    : isProjectSettingsPage 
+      ? "Project Settings" 
+      : isMainSettingsPage 
+        ? "Helix Settings" 
+        : pathname === "/notifications"
+          ? "Notifications"
+          : (currentLink?.title || "Dashboard");
+  const currentSec = isSidebarHidden ? "proj" : (currentLink?.sec || "Home");
   return (
     <main className="bg-(--bg-main) text-(--text-primary) overflow-hidden">
-      <Topbar title={currentTitle} />
+      <Topbar title={currentTitle} onProfileClick={() => setIsProfileOpen(true)} />
       <section className="relative mt-16 flex w-full justify-start workspace-height">
-        {!isChatPage && (
+        {!isSidebarHidden && (
           <Sidebar
             collapsed={sideColl}
             setCollapsed={setSideColl}
@@ -53,7 +64,7 @@ export default function AppShell({ children }) {
             onProfileClick={() => setIsProfileOpen(true)}
           />
         )}
-        {!sideColl && !isChatPage && (
+        {!sideColl && !isSidebarHidden && (
           <div
             className="fixed inset-0 z-40 bg-black/40 md:hidden"
             onClick={() => setSideColl(true)}

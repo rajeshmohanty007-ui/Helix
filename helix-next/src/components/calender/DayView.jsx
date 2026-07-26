@@ -14,6 +14,7 @@ export default function DayView({
   selectedDate,
   events = [],
   onAddEventClick,
+  onEventClick,
 }) {
   const [hourHeight, setHourHeight] = useState(80);
   const [now, setNow] = useState(new Date());
@@ -217,7 +218,8 @@ export default function DayView({
             return (
               <div
                 key={event.id}
-                className="absolute right-4 left-24 z-10 overflow-hidden rounded-xl p-3 text-left shadow-md border border-white/5 transition hover:scale-[1.01] hover:shadow-lg flex flex-col justify-between"
+                onClick={() => onEventClick && onEventClick(event)}
+                className="absolute right-4 left-24 z-10 overflow-hidden rounded-xl p-3 text-left shadow-md border border-white/5 transition hover:scale-[1.01] hover:shadow-lg flex flex-col justify-between cursor-pointer"
                 style={{
                   top: `${topPos + 2}px`,
                   height: `${heightPos - 4}px`,

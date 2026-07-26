@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { createTaskHandler } from "@/handlers/create/createTaskHandler"
+import { recalculateProductivityScore } from "@/lib/dashboard"
 
 export async function GET(req) {
   try {
@@ -66,24 +67,34 @@ export async function PATCH(req) {
         data: { completed: !!body.completed },
       })
 
+      await recalculateProductivityScore(session.user.id)
+
       return Response.json({ success: true, subtask: updatedSubtask })
     }
 
     // Handle Task update
-    const { id, completed } = body
+    const { id, completed, title, description, priority, deadline, duration } = body
     if (!id) {
       return Response.json({ error: "Task ID is required" }, { status: 400 })
     }
+
+    const updateData = {}
+    if (completed !== undefined) updateData.completed = !!completed
+    if (title !== undefined) updateData.title = title
+    if (description !== undefined) updateData.description = description
+    if (priority !== undefined) updateData.priority = priority
+    if (deadline !== undefined) updateData.deadline = deadline
+    if (duration !== undefined) updateData.duration = duration
 
     const updatedTask = await prisma.task.update({
       where: {
         id,
         userId: session.user.id,
       },
-      data: {
-        completed: !!completed,
-      },
+      data: updateData,
     })
+
+    await recalculateProductivityScore(session.user.id)
 
     return Response.json({ success: true, task: updatedTask })
   } catch (error) {

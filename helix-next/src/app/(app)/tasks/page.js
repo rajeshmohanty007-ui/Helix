@@ -6,6 +6,13 @@ import TaskDesc from "@/components/tasks/TaskDesc";
 import QuickTask from "@/components/tasks/QuickTask";
 import AddTaskListModal from "@/components/tasks/AddTaskListModal";
 import AddTaskModal from "@/components/tasks/AddTaskModal";
+import {
+  toggleTask,
+  toggleSubtask,
+  deleteTask,
+  clearList,
+  deleteList,
+} from "@/ScriptFunc/tasks";
 
 export default function TasksPage() {
   const [mounted, setMounted] = useState(false);
@@ -19,9 +26,11 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
+  const [mobileShowDesc, setMobileShowDesc] = useState(false);
 
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState(null);
 
   // Load custom task lists from localStorage on mount
   useEffect(() => {
@@ -52,6 +61,7 @@ export default function TasksPage() {
     if (!mounted || activeTaskList === "Quick Tasks") {
       setTasks([]);
       setActiveTask(null);
+      setMobileShowDesc(false);
       return;
     }
 
@@ -66,6 +76,7 @@ export default function TasksPage() {
           } else {
             setActiveTask(null);
           }
+          setMobileShowDesc(false);
         }
       })
       .catch((err) => console.error("Error loading tasks:", err))
@@ -85,149 +96,51 @@ export default function TasksPage() {
     setActiveTaskList(newListName);
   };
 
-  const handleTaskAdded = (newTask) => {
-    setTasks((prev) => [newTask, ...prev]);
-    setActiveTask(newTask);
+  const handleTaskSaved = (savedTask) => {
+    setTasks((prev) => {
+      const exists = prev.some((t) => t.id === savedTask.id);
+      if (exists) {
+        return prev.map((t) => (t.id === savedTask.id ? savedTask : t));
+      } else {
+        return [savedTask, ...prev];
+      }
+    });
+    setActiveTask(savedTask);
   };
 
   const handleToggleTask = async (taskId, newCompleted) => {
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ id: taskId, completed: newCompleted }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, completed: newCompleted } : t))
-      );
-
-      if (activeTask && activeTask.id === taskId) {
-        setActiveTask((prev) => ({ ...prev, completed: newCompleted }));
-      }
-    } catch (err) {
-      console.error("Error toggling task:", err);
-    }
+    await toggleTask(taskId, newCompleted, setTasks, activeTask, setActiveTask);
   };
 
   const handleToggleSubtask = async (subtaskId, newCompleted) => {
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ subtaskId, completed: newCompleted }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      setTasks((prev) =>
-        prev.map((t) => {
-          if (t.subtasks && t.subtasks.some((s) => s.id === subtaskId)) {
-            return {
-              ...t,
-              subtasks: t.subtasks.map((s) =>
-                s.id === subtaskId ? { ...s, completed: newCompleted } : s
-              ),
-            };
-          }
-          return t;
-        })
-      );
-
-      if (activeTask && activeTask.subtasks) {
-        setActiveTask((prev) => ({
-          ...prev,
-          subtasks: prev.subtasks.map((s) =>
-            s.id === subtaskId ? { ...s, completed: newCompleted } : s
-          ),
-        }));
-      }
-    } catch (err) {
-      console.error("Error toggling subtask:", err);
-    }
+    await toggleSubtask(subtaskId, newCompleted, setTasks, activeTask, setActiveTask);
   };
 
   const handleDeleteTask = async (taskId) => {
-    try {
-      const res = await fetch(`/api/tasks?id=${taskId}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      if (activeTask && activeTask.id === taskId) {
-        setActiveTask(null);
-      }
-    } catch (err) {
-      console.error("Error deleting task:", err);
-    }
+    await deleteTask(taskId, setTasks, activeTask, setActiveTask);
   };
 
   const handleClearList = async (listName) => {
-    try {
-      const res = await fetch(`/api/tasks?list=${encodeURIComponent(listName)}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to clear tasks");
-      }
-
-      if (activeTaskList === listName) {
-        setTasks([]);
-        setActiveTask(null);
-      }
-    } catch (err) {
-      console.error("Error clearing list:", err);
-    }
+    await clearList(listName, activeTaskList, setTasks, setActiveTask);
   };
 
   const handleDeleteList = async (listName) => {
-    try {
-      const res = await fetch(`/api/tasks?list=${encodeURIComponent(listName)}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to delete list");
-      }
-
-      // Filter list out
-      const updated = taskLists.filter((list) => list !== listName);
-      setTaskLists(updated);
-
-      // Sync custom lists to localStorage
-      const defaults = ["Quick Tasks", "Daily", "College", "Freelance"];
-      const customOnly = updated.filter((list) => !defaults.includes(list));
-      localStorage.setItem("custom_task_lists", JSON.stringify(customOnly));
-
-      // Redirect active tab if deleted
-      if (activeTaskList === listName) {
-        setActiveTaskList("Daily");
-      }
-    } catch (err) {
-      console.error("Error deleting list:", err);
-    }
+    await deleteList(listName, activeTaskList, setActiveTaskList, taskLists, setTaskLists);
   };
 
   return (
     <div className="h-full flex-1 overflow-y-auto p-4">
       <div className="flex h-full flex-col gap-2 overflow-hidden rounded-2xl border border-(--border-color) bg-(--bg-main) p-4 shadow-md">
-        <TaskListBar
-          tasklists={taskLists}
-          active={activeTaskList}
-          setActive={setActiveTaskList}
-          onAddListClick={() => setIsListModalOpen(true)}
-          onClearList={handleClearList}
-          onDeleteList={handleDeleteList}
-        />
+        <div className={mobileShowDesc ? "hidden md:block" : "block"}>
+          <TaskListBar
+            tasklists={taskLists}
+            active={activeTaskList}
+            setActive={setActiveTaskList}
+            onAddListClick={() => setIsListModalOpen(true)}
+            onClearList={handleClearList}
+            onDeleteList={handleDeleteList}
+          />
+        </div>
         <div className="flex min-h-0 w-full flex-1">
           {activeTaskList === "Quick Tasks" ? (
             <QuickTask />
@@ -236,14 +149,28 @@ export default function TasksPage() {
               <TaskBar
                 tasks={tasks}
                 activeTask={activeTask}
-                onSelectTask={setActiveTask}
-                onAddTaskClick={() => setIsTaskModalOpen(true)}
+                onSelectTask={(task) => {
+                  setActiveTask(task);
+                  setMobileShowDesc(true);
+                }}
+                onAddTaskClick={() => {
+                  setTaskToEdit(null);
+                  setIsTaskModalOpen(true);
+                }}
                 onToggleTask={handleToggleTask}
                 onDeleteTask={handleDeleteTask}
+                className={mobileShowDesc ? "hidden md:flex" : "flex"}
               />
               <TaskDesc 
                 task={activeTask} 
                 onToggleSubtask={handleToggleSubtask} 
+                onBack={() => setMobileShowDesc(false)}
+                onEdit={(task) => {
+                  setTaskToEdit(task);
+                  setIsTaskModalOpen(true);
+                }}
+                onDelete={handleDeleteTask}
+                className={mobileShowDesc ? "flex" : "hidden md:flex"}
               />
             </>
           )}
@@ -258,9 +185,13 @@ export default function TasksPage() {
       />
       <AddTaskModal
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
+        onClose={() => {
+          setIsTaskModalOpen(false);
+          setTaskToEdit(null);
+        }}
         taskList={activeTaskList}
-        onTaskAdded={handleTaskAdded}
+        onTaskAdded={handleTaskSaved}
+        taskToEdit={taskToEdit}
       />
     </div>
   );

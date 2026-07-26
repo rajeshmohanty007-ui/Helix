@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTheme } from "@/context/ThemeContext";
+import Link from "next/link";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
@@ -75,7 +76,9 @@ const Sidebar = ({ collapsed, setCollapsed, sec, onProfileClick }) => {
       </div>
       <div className={`absolute bottom-0 left-0 z-51 flex w-full border-t border-[var(--border-color)] bg-[var(--bg-main)] transition-all duration-300 ${collapsed ? "flex-col items-center gap-4 py-4 px-2" : "items-center justify-between p-3"}`}>
         <div className="flex items-center gap-2">
-          <SettingsRoundedIcon className="cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]" />
+          <Link href="/settings" className="flex items-center justify-center p-1 rounded-lg hover:bg-[var(--bg-hover)] transition" title="Settings">
+            <SettingsRoundedIcon className="cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]" />
+          </Link>
           {!collapsed && <ThemeToggle />}
         </div>
         <button

@@ -1,8 +1,7 @@
 import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/providers/ToastProvider";
-
-
+import { DialogProvider } from "@/components/providers/DialogProvider";
 
 export default function RootLayout({ children }) {
   return (
@@ -12,7 +11,9 @@ export default function RootLayout({ children }) {
       <body>
         <ThemeProvider>
           <ToastProvider>
-            {children}
+            <DialogProvider>
+              {children}
+            </DialogProvider>
           </ToastProvider>
         </ThemeProvider>
       </body>

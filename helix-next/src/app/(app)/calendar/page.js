@@ -6,20 +6,16 @@ import MonthCalendar from "@/components/calender/Month";
 import AgendaCard from "@/components/calender/AgendaCard";
 import DayView from "@/components/calender/DayView";
 import AddEventModal from "@/components/calender/AddEventModal";
+import { getTodayString, formatDateString } from "@/ScriptFunc/calendar";
 
 export default function CalendarPage() {
-  const getTodayString = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
+
 
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
+  const [eventToEdit, setEventToEdit] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
@@ -48,14 +44,7 @@ export default function CalendarPage() {
     fetchData();
   }, []);
 
-  const formatDateString = (dateInput) => {
-    const d = new Date(dateInput);
-    if (isNaN(d.getTime())) return "";
-    const year = d.getUTCFullYear();
-    const month = String(d.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(d.getUTCDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
+
 
   const selectedDateEvents = events.filter(
     (event) => formatDateString(event.date) === selectedDate
@@ -71,14 +60,24 @@ export default function CalendarPage() {
             tasks={tasks}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
-            onAddEvent={() => setIsAddEventModalOpen(true)}
+            onAddEvent={() => {
+              setEventToEdit(null);
+              setIsAddEventModalOpen(true);
+            }}
           />
         </div>
         <div className="helix-scroll h-full flex-1 overflow-y-auto p-4">
           <DayView
             selectedDate={selectedDate}
             events={selectedDateEvents}
-            onAddEventClick={() => setIsAddEventModalOpen(true)}
+            onAddEventClick={() => {
+              setEventToEdit(null);
+              setIsAddEventModalOpen(true);
+            }}
+            onEventClick={(event) => {
+              setEventToEdit(event);
+              setIsAddEventModalOpen(true);
+            }}
           />
         </div>
       </div>
@@ -90,7 +89,10 @@ export default function CalendarPage() {
           tasks={tasks}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
-          onAddEvent={() => setIsAddEventModalOpen(true)}
+          onAddEvent={() => {
+            setEventToEdit(null);
+            setIsAddEventModalOpen(true);
+          }}
         />
         
         <div className="mt-4 space-y-3">
@@ -102,7 +104,10 @@ export default function CalendarPage() {
               })}
             </h3>
             <button
-              onClick={() => setIsAddEventModalOpen(true)}
+              onClick={() => {
+                setEventToEdit(null);
+                setIsAddEventModalOpen(true);
+              }}
               className="text-xs font-semibold text-[var(--accent)] hover:underline"
             >
               + Add Event
@@ -124,18 +129,26 @@ export default function CalendarPage() {
                 priority={event.priority}
                 status={event.status}
                 assignees={[]}
+                onClick={() => {
+                  setEventToEdit(event);
+                  setIsAddEventModalOpen(true);
+                }}
               />
             ))
           )}
         </div>
       </div>
 
-      {/* Event creation modal */}
+      {/* Event creation / editing modal */}
       <AddEventModal
         isOpen={isAddEventModalOpen}
-        onClose={() => setIsAddEventModalOpen(false)}
+        onClose={() => {
+          setIsAddEventModalOpen(false);
+          setEventToEdit(null);
+        }}
         defaultDate={selectedDate}
         onEventAdded={fetchData}
+        eventToEdit={eventToEdit}
       />
     </div>
   );

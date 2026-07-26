@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTheme } from "@/context/ThemeContext";
+import { useDialog } from "@/components/providers/DialogProvider";
 import {
   IconButton,
   Menu,
@@ -10,11 +11,12 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ShareIcon from "@mui/icons-material/Share";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 
-
-const TaskDesc = ({ task, onToggleSubtask }) => {
+const TaskDesc = ({ task, onToggleSubtask, onBack, className, onEdit, onDelete }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const { dark } = useTheme();
+  const { showConfirm } = useDialog();
   const open = Boolean(anchorEl);
 
   const handleMenuOpen = (event) => {
@@ -28,7 +30,7 @@ const TaskDesc = ({ task, onToggleSubtask }) => {
 
   if (!task) {
     return (
-      <section className="flex h-full flex-1 flex-col items-center justify-center border-l border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+      <section className={`flex h-full flex-1 flex-col items-center justify-center border-l-0 md:border-l border-[var(--border-color)] bg-[var(--bg-card)] p-6 ${className || ""}`}>
         <p className="text-sm text-[var(--text-secondary)] italic">Select a task to view details</p>
       </section>
     );
@@ -36,18 +38,29 @@ const TaskDesc = ({ task, onToggleSubtask }) => {
 
   const sortedSubtasks = task.subtasks
     ? [...task.subtasks].sort((a, b) => {
-        if (a.completed === b.completed) return 0;
-        return a.completed ? 1 : -1;
-      })
+      if (a.completed === b.completed) return 0;
+      return a.completed ? 1 : -1;
+    })
     : [];
 
   return (
-    <section className="helix-scroll flex h-full flex-1 flex-col overflow-y-auto bg-[var(--bg-card)] p-6">
+    <section className={`helix-scroll flex h-full flex-1 flex-col overflow-y-auto bg-[var(--bg-card)] p-6 ${className || ""}`}>
       {/* Title Header */}
-      <div className="mb-6 flex items-start justify-between border-b border-[var(--border-color)] pb-4">
-        <h1 className={`text-2xl font-bold ${task.completed ? "text-[var(--text-secondary)] line-through" : "text-[var(--text-primary)]"}`}>
-          {task.title}
-        </h1>
+      <div className="mb-6 flex items-start justify-between border-b border-[var(--border-color)] pb-4 gap-2">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="md:hidden p-1.5 mt-0.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-primary)] transition cursor-pointer flex items-center justify-center shrink-0"
+              aria-label="Go back to task list"
+            >
+              <ArrowBackRoundedIcon />
+            </button>
+          )}
+          <h1 className={`text-2xl font-bold ${task.completed ? "text-[var(--text-secondary)] line-through" : "text-[var(--text-primary)]"}`}>
+            {task.title}
+          </h1>
+        </div>
 
         <IconButton
           size="small"
@@ -76,7 +89,7 @@ const TaskDesc = ({ task, onToggleSubtask }) => {
           },
         }}
       >
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem onClick={() => { handleMenuClose(); onEdit && onEdit(task); }}>
           <ListItemIcon>
             <EditIcon
               fontSize="small"
@@ -88,19 +101,21 @@ const TaskDesc = ({ task, onToggleSubtask }) => {
           Edit
         </MenuItem>
 
-        <MenuItem onClick={handleMenuClose}>
-          <ListItemIcon>
-            <ShareIcon
-              fontSize="small"
-              sx={{
-                color: dark ? "rgb(249,250,251)" : "rgb(17,24,39)",
-              }}
-            />
-          </ListItemIcon>
-          Share
-        </MenuItem>
-
-        <MenuItem onClick={handleMenuClose} sx={{ color: "#ef4444" }}>
+        <MenuItem
+          onClick={async () => {
+            handleMenuClose();
+            const confirmed = await showConfirm(
+              "Are you sure you want to delete this task?",
+              "Delete Task",
+              "danger",
+              "Delete"
+            );
+            if (confirmed) {
+              onDelete && onDelete(task.id);
+            }
+          }}
+          sx={{ color: "#ef4444" }}
+        >
           <ListItemIcon>
             <DeleteOutlineRoundedIcon
               fontSize="small"
@@ -204,4 +219,4 @@ const TaskDesc = ({ task, onToggleSubtask }) => {
   );
 };
 
-export default TaskDesc
+export default TaskDesc;

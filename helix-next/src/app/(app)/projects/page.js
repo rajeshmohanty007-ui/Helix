@@ -9,93 +9,10 @@ import SeeMore from "@/components/ui/SeeMore";
 import MobileNav from "@/components/layouts/MobileNav";
 import AddUpdateModal from "@/components/projects/AddUpdateModal";
 import AddObjectiveModal from "@/components/projects/AddObjectiveModal";
+import AddProjectModal from "@/components/projects/AddProjectModal";
 
-import { dummyChats } from "./dumChats";
-import {
-  Add,
-  Search,
-  KeyboardDoubleArrowLeft,
-  KeyboardDoubleArrowRight,
-} from "@mui/icons-material";
+import ProjectSidebar from "@/components/projects/ProjectSidebar";
 import CircularProgress from "@mui/material/CircularProgress";
-
-const ProjectSide = ({
-  collapsed,
-  setCollapsed,
-  activeProj,
-  setActiveProj,
-  projects = [],
-}) => {
-  return (
-    <aside
-      className={`absolute flex flex-col top-0 left-0 z-25 h-full rounded-r-4xl border-r border-(--border-color) bg-(--bg-sidebar) transition-all duration-300 lg:relative ${collapsed ? "w-16" : "w-72"} `}
-    >
-      {/* Collapse Toggle */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute top-1/2 -right-4 z-26 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-(--bg-card) shadow-lg transition hover:scale-105"
-      >
-        {collapsed ? (
-          <KeyboardDoubleArrowRight fontSize="small" />
-        ) : (
-          <KeyboardDoubleArrowLeft fontSize="small" />
-        )}
-      </button>
-
-      {/* Header */}
-      <div className="flex items-center justify-between p-2">
-        {!collapsed && <h2 className="text-lg font-semibold">Projects</h2>}
-
-        <button className="rounded-lg p-2 hover:bg-(--bg-hover)">
-          <Add />
-        </button>
-      </div>
-
-      {/* Search */}
-      {!collapsed && (
-        <div className="px-4 pb-4">
-          <div className="flex items-center gap-2 rounded-lg bg-(--bg-main) px-3 py-2">
-            <Search fontSize="small" />
-            <input
-              type="text"
-              placeholder="Search projects..."
-              className="w-full bg-transparent text-sm outline-none"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Project List */}
-      <div className="flex flex-col flex-1 items-center gap-2 overflow-x-hidden overflow-y-auto px-2 helix-scroll">
-        {projects.map((project) => (
-          <button
-            key={project.id}
-            className={`relative flex w-full items-center gap-3 px-3 py-3 text-left transition ${!collapsed && activeProj?.id === project.id ? "rounded-xl bg-(--accent) text-white" : ""} ${activeProj?.id !== project.id ? "rounded-xl hover:bg-(--bg-hover)" : ""}`}
-            onClick={() => setActiveProj(project)}
-          >
-            {collapsed && activeProj?.id === project.id && (
-              <span className="absolute top-0 left-0 h-full w-0.5 bg-(--accent)" />
-            )}
-            {/* Status Dot */}
-            <span
-              className={`h-4 w-4 rounded-full ${
-                project.status === "active" ? "bg-green-500" : "bg-yellow-500"
-              } `}
-            />
-
-            {!collapsed && (
-              <div className="flex flex-col">
-                <span className="font-medium">{project.name}</span>
-
-                <span className="text-xs opacity-60">{project.status}</span>
-              </div>
-            )}
-          </button>
-        ))}
-      </div>
-    </aside>
-  );
-};
 
 export default function ProjectsPage() {
   const [mounted, setMounted] = useState(false);
@@ -115,6 +32,7 @@ export default function ProjectsPage() {
 
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isObjectiveModalOpen, setIsObjectiveModalOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
 
   const [mobileTab, setMobileTab] = useState("updates");
   const [projColl, setProjColl] = useState(true);
@@ -188,6 +106,11 @@ export default function ProjectsPage() {
     setObjectives((prev) => [newObjective, ...prev]);
   };
 
+  const handleProjectAdded = (newProject) => {
+    setProjects((prev) => [newProject, ...prev]);
+    setActiveProj(newProject);
+  };
+
   const containerRef = useRef(null);
 
   const startResize = (e, section) => {
@@ -227,12 +150,13 @@ export default function ProjectsPage() {
 
   return (
     <div className="relative flex h-full flex-1">
-      <ProjectSide
+      <ProjectSidebar
         collapsed={projColl}
         setCollapsed={setProjColl}
         activeProj={activeProj}
         setActiveProj={setActiveProj}
         projects={projects}
+        onAddProjectClick={() => setIsProjectModalOpen(true)}
       />
       {!projColl && (
         <div
@@ -366,7 +290,7 @@ export default function ProjectsPage() {
                 Chats
               </h1>
               <div className="min-h-0 min-w-0 flex-1">
-                <Chats data={dummyChats} activeProj={activeProj} />
+                <Chats activeProj={activeProj} />
               </div>
             </div>
           </div>
@@ -390,7 +314,7 @@ export default function ProjectsPage() {
                 />
               )}
 
-              {mobileTab === "chats" && <Chats data={dummyChats} />}
+              {mobileTab === "chats" && <Chats activeProj={activeProj} />}
             </div>
 
             <MobileNav active={mobileTab} setActive={setMobileTab} />
@@ -415,6 +339,11 @@ export default function ProjectsPage() {
           />
         </>
       )}
+      <AddProjectModal
+        isOpen={isProjectModalOpen}
+        onClose={() => setIsProjectModalOpen(false)}
+        onProjectAdded={handleProjectAdded}
+      />
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma"
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth"
 
 export async function GET() {
   try {
@@ -16,6 +18,87 @@ export async function GET() {
       },
     })
     return Response.json(projects)
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 })
+  }
+}
+
+export async function POST(req) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session || !session.user) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const body = await req.json()
+    const { name, description, usernames } = body
+
+    if (!name || !name.trim()) {
+      return Response.json({ error: "Project name is required" }, { status: 400 })
+    }
+
+    let memberConnect = [{ id: session.user.id }]
+
+    if (Array.isArray(usernames) && usernames.length > 0) {
+      // Find matching users in database
+      const dbUsers = await prisma.user.findMany({
+        where: {
+          username: { in: usernames },
+        },
+        select: {
+          id: true,
+          username: true,
+        },
+      })
+
+      const foundUsernames = dbUsers.map((u) => u.username)
+      const missingUsernames = usernames.filter((un) => !foundUsernames.includes(un))
+
+      if (missingUsernames.length > 0) {
+        return Response.json(
+          { error: `User(s) not found: ${missingUsernames.join(", ")}` },
+          { status: 400 }
+        )
+      }
+
+      // Connect these users (avoiding duplicates if session.user.id is already in dbUsers)
+      dbUsers.forEach((user) => {
+        if (user.id !== session.user.id) {
+          memberConnect.push({ id: user.id })
+        }
+      })
+    }
+
+    // Create the Project
+    const project = await prisma.project.create({
+      data: {
+        name: name.trim(),
+        description: description?.trim() || null,
+        status: "active",
+        members: {
+          connect: memberConnect,
+        },
+        channels: {
+          create: [
+            {
+              name: "general",
+              type: "general",
+              status: "active",
+            },
+          ],
+        },
+      },
+      include: {
+        members: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+    })
+
+    return Response.json(project)
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 })
   }

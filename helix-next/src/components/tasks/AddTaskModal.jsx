@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CircularProgress from "@mui/material/CircularProgress";
 
-export default function AddTaskModal({ isOpen, onClose, taskList, onTaskAdded }) {
+export default function AddTaskModal({ isOpen, onClose, taskList, onTaskAdded, taskToEdit }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("Medium");
@@ -17,7 +17,7 @@ export default function AddTaskModal({ isOpen, onClose, taskList, onTaskAdded })
   const [aiSubtasks, setAiSubtasks] = useState([]);
   const [error, setError] = useState("");
 
-  // Sync client-side 2-minute cooldown on open
+  // Sync client-side AI request cooldown
   useEffect(() => {
     if (isOpen) {
       const lastRequest = localStorage.getItem("helix_task_ai_cooldown");
@@ -31,7 +31,7 @@ export default function AddTaskModal({ isOpen, onClose, taskList, onTaskAdded })
     }
   }, [isOpen]);
 
-  // Run cooldown countdown timer
+  // Cooldown timer count down
   useEffect(() => {
     if (cooldownTime <= 0) return;
     const timer = setInterval(() => {
@@ -45,6 +45,48 @@ export default function AddTaskModal({ isOpen, onClose, taskList, onTaskAdded })
     }, 1000);
     return () => clearInterval(timer);
   }, [cooldownTime]);
+
+  // Sync state with edit mode or defaults
+  useEffect(() => {
+    if (taskToEdit) {
+      setTitle(taskToEdit.title || "");
+      setDescription(taskToEdit.description || "");
+      setPriority(taskToEdit.priority || "Medium");
+      setDuration(taskToEdit.duration || "");
+
+      if (taskToEdit.deadline && taskToEdit.deadline !== "No deadline") {
+        try {
+          const d = new Date(taskToEdit.deadline);
+          if (!isNaN(d.getTime())) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const hours = String(d.getHours()).padStart(2, "0");
+            const minutes = String(d.getMinutes()).padStart(2, "0");
+            setDeadline(`${year}-${month}-${day}T${hours}:${minutes}`);
+          } else {
+            setDeadline("");
+          }
+        } catch {
+          setDeadline("");
+        }
+      } else {
+        setDeadline("");
+      }
+
+      setAiTags(taskToEdit.tags || []);
+      setAiSubtasks(taskToEdit.subtasks || []);
+    } else {
+      setTitle("");
+      setDescription("");
+      setPriority("Medium");
+      setDeadline("");
+      setDuration("");
+      setAiTags([]);
+      setAiSubtasks([]);
+    }
+    setError("");
+  }, [taskToEdit, isOpen]);
 
   if (!isOpen) return null;
 
@@ -79,7 +121,6 @@ export default function AddTaskModal({ isOpen, onClose, taskList, onTaskAdded })
         if (metadata.subtasks) setAiSubtasks(metadata.subtasks);
       }
 
-      // Save cooldown to localStorage
       localStorage.setItem("helix_task_ai_cooldown", Date.now().toString());
       setCooldownTime(120);
     } catch (err) {
@@ -99,35 +140,47 @@ export default function AddTaskModal({ isOpen, onClose, taskList, onTaskAdded })
     setLoading(true);
 
     try {
-      const res = await fetch("/api/tasks", {
-        method: "POST",
+      const url = "/api/tasks";
+      const method = taskToEdit ? "PATCH" : "POST";
+      const body = {
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        deadline: deadline || "No deadline",
+        duration: duration.trim() || "0 hrs",
+      };
+
+      if (taskToEdit) {
+        body.id = taskToEdit.id;
+      } else {
+        body.taskList = taskList;
+        body.tags = aiTags;
+        body.subtasks = aiSubtasks;
+      }
+
+      const res = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          priority,
-          deadline: deadline || "No deadline",
-          duration: duration.trim() || "0 hrs",
-          taskList,
-          tags: aiTags,
-          subtasks: aiSubtasks,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to create task");
+        throw new Error(data.error || `Failed to ${taskToEdit ? "save" : "create"} task`);
       }
 
-      setTitle("");
-      setDescription("");
-      setPriority("Medium");
-      setDeadline("");
-      setDuration("");
-      setAiTags([]);
-      setAiSubtasks([]);
+      if (!taskToEdit) {
+        setTitle("");
+        setDescription("");
+        setPriority("Medium");
+        setDeadline("");
+        setDuration("");
+        setAiTags([]);
+        setAiSubtasks([]);
+      }
+
       if (onTaskAdded) {
         onTaskAdded(data.task);
       }
@@ -144,7 +197,9 @@ export default function AddTaskModal({ isOpen, onClose, taskList, onTaskAdded })
       <div className="absolute inset-0" onClick={onClose} />
       <div className="relative w-[90%] max-w-lg rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-4">
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">New Task ({taskList})</h2>
+          <h2 className="text-xl font-bold text-[var(--text-primary)]">
+            {taskToEdit ? "Edit Task" : `New Task (${taskList})`}
+          </h2>
           <button
             onClick={onClose}
             className="rounded-xl p-2 text-[var(--text-secondary)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
@@ -163,23 +218,25 @@ export default function AddTaskModal({ isOpen, onClose, taskList, onTaskAdded })
                 Task Title <span className="text-red-500">*</span>
               </label>
               
-              <button
-                type="button"
-                onClick={handleCreateWithAI}
-                disabled={aiLoading || cooldownTime > 0 || !title.trim()}
-                className="rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 hover:bg-[var(--accent)]/25 px-3 py-1.5 text-xs font-semibold text-[var(--accent)] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
-              >
-                {aiLoading ? (
-                  <>
-                    <CircularProgress size={12} color="inherit" />
-                    <span>AI Analyzing...</span>
-                  </>
-                ) : cooldownTime > 0 ? (
-                  <span>AI Cooldown ({cooldownTime}s)</span>
-                ) : (
-                  <span>✨ Create with AI</span>
-                )}
-              </button>
+              {!taskToEdit && (
+                <button
+                  type="button"
+                  onClick={handleCreateWithAI}
+                  disabled={aiLoading || cooldownTime > 0 || !title.trim()}
+                  className="rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 hover:bg-[var(--accent)]/25 px-3 py-1.5 text-xs font-semibold text-[var(--accent)] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+                >
+                  {aiLoading ? (
+                    <>
+                      <CircularProgress size={12} color="inherit" />
+                      <span>AI Analyzing...</span>
+                    </>
+                  ) : cooldownTime > 0 ? (
+                    <span>AI Cooldown ({cooldownTime}s)</span>
+                  ) : (
+                    <span>✨ Create with AI</span>
+                  )}
+                </button>
+              )}
             </div>
             
             <input
@@ -290,7 +347,7 @@ export default function AddTaskModal({ isOpen, onClose, taskList, onTaskAdded })
                   <span>Saving...</span>
                 </>
               ) : (
-                <span>Save Task</span>
+                <span>{taskToEdit ? "Save Changes" : "Save Task"}</span>
               )}
             </button>
           </div>

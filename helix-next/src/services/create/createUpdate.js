@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { recalculateProductivityScore, addRecentActivity } from "@/lib/dashboard"
 
 export async function createUpdate({ projectId, userId, action, content }) {
   if (!projectId) {
@@ -14,7 +15,7 @@ export async function createUpdate({ projectId, userId, action, content }) {
   const allowedActions = ["completed", "started", "blocked", "updated"]
   const finalAction = allowedActions.includes(action) ? action : "updated"
 
-  return await prisma.projectUpdate.create({
+  const createdUpdate = await prisma.projectUpdate.create({
     data: {
       projectId,
       userId,
@@ -30,4 +31,26 @@ export async function createUpdate({ projectId, userId, action, content }) {
       },
     },
   })
+
+  // Recalculate productivity score
+  await recalculateProductivityScore(userId)
+
+  // Fetch project details for logging
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { name: true },
+  })
+
+  if (project) {
+    await addRecentActivity({
+      userId,
+      username: createdUpdate.user.username,
+      projectId,
+      projectName: project.name,
+      action: `Added update: ${finalAction}`,
+      description: content,
+    })
+  }
+
+  return createdUpdate
 }

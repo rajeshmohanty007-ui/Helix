@@ -19,6 +19,11 @@ model User {
   passwordHash String
 
   role         String   @default("member")
+  
+  streak            Int      @default(0)
+  lastActive        DateTime?
+  productivityScore Int      @default(0)
+  spentTime         Int      @default(0)
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -34,11 +39,12 @@ model User {
 }
 
 model Project {
-  id         String   @id @default(cuid())
-  name       String
-  status     String   @default("active") // "active", "paused"
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      String   @default("active") // "active", "paused"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relationships
   members    User[]             @relation("ProjectMembers")
@@ -145,9 +151,22 @@ model CalendarEvent {
   type        String   @default("task") // "task", "deadline", "meeting", "focus"
   priority    String   @default("medium") // "low", "medium", "high"
   status      String   @default("pending") // "completed", "in-progress", "pending"
+  repeat      String   @default("none") // "none", "daily", "weekly", "monthly", "yearly"
+  repeatGroupId String?
   
   // Relations
   creatorId   String
   creator     User     @relation("EventCreator", fields: [creatorId], references: [id])
   assignees   User[]   @relation("EventAssignees")
+}
+
+model RecentActivity {
+  id          String   @id @default(cuid())
+  userId      String
+  username    String
+  projectId   String
+  projectName String
+  action      String
+  description String?
+  createdAt   DateTime @default(now())
 }

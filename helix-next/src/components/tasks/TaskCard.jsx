@@ -14,8 +14,6 @@ import ShareIcon from "@mui/icons-material/Share";
 const TaskCard = ({
   task,
   selected,
-  expandedTask,
-  setExpandedTask,
   onToggleTask,
   onDeleteTask,
 }) => {
@@ -57,9 +55,6 @@ const TaskCard = ({
                 ? "text-[var(--text-secondary)] line-through"
                 : "text-[var(--text-primary)]"
             }`}
-            onClick={() => {
-              setExpandedTask(expandedTask === task.id ? null : task.id);
-            }}
           >
             {task.title}
           </h3>
@@ -143,39 +138,7 @@ const TaskCard = ({
           Delete
         </MenuItem>
       </Menu>
-      {expandedTask === task.id && (
-        <div className="transition-300 mt-4 border-t border-[var(--border-color)] pt-4 transition md:hidden">
-          <p className="mb-3 text-sm text-[var(--text-secondary)]">
-            {task.description}
-          </p>
 
-          <div className="flex flex-col gap-2 text-sm">
-            <div>
-              <span className="font-medium">Priority:</span> {task.priority}
-            </div>
-
-            <div>
-              <span className="font-medium">Deadline:</span> {task.deadline}
-            </div>
-
-            <div>
-              <span className="font-medium">Estimated Time:</span>{" "}
-              {task.duration}
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {task.tags?.map((tag) => (
-              <span
-                key={tag.id || tag.name || tag}
-                className="rounded-full bg-[var(--bg-hover)] px-2 py-1 text-xs"
-              >
-                {tag.name || tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

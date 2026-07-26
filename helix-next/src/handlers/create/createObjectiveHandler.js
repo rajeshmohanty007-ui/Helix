@@ -1,6 +1,8 @@
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { createObjective } from "@/services/create/createObjective"
+import { addRecentActivity } from "@/lib/dashboard"
+import { prisma } from "@/lib/prisma"
 
 export async function createObjectiveHandler(req, projectIdFromParams) {
   try {
@@ -22,6 +24,23 @@ export async function createObjectiveHandler(req, projectIdFromParams) {
       status: body.status,
       memberIds: body.memberIds,
     })
+
+    // Log recent activity for the project
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { name: true },
+    })
+
+    if (project) {
+      await addRecentActivity({
+        userId: session.user.id,
+        username: session.user.username,
+        projectId,
+        projectName: project.name,
+        action: `Created Objective: ${body.title}`,
+        description: `Deadline: ${body.deadline} • Status: ${body.status || "pending"}`,
+      })
+    }
 
     return Response.json({
       success: true,
