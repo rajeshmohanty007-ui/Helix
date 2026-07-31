@@ -33,7 +33,7 @@ const TaskCard = ({
     <div
       className={`group/task-card w-full rounded-xl border p-3 text-left transition-all ${
         selected
-          ? "border-[var(--accent)] bg-[var(--bg-hover)]"
+          ? "border-[var(--border-color)] bg-[var(--bg-card)] md:border-[var(--accent)] md:bg-[var(--bg-hover)]"
           : "border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)]"
       }`}
     >

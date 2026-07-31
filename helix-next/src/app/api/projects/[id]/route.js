@@ -4,6 +4,11 @@ import { authOptions } from "@/lib/auth"
 
 export async function GET(req, { params }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session || !session.user) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const resolvedParams = await params
     const id = resolvedParams.id
 
@@ -16,11 +21,29 @@ export async function GET(req, { params }) {
             username: true,
           },
         },
+        admins: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+        managers: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
       },
     })
 
     if (!project) {
       return Response.json({ error: "Project not found" }, { status: 404 })
+    }
+
+    const isMember = project.members.some((m) => m.id === session.user.id)
+    const isCreator = project.creatorId === session.user.id
+    if (!isMember && !isCreator) {
+      return Response.json({ error: "Access denied" }, { status: 403 })
     }
 
     return Response.json(project)
@@ -40,9 +63,67 @@ export async function PATCH(req, { params }) {
     const id = resolvedParams.id
 
     const body = await req.json()
-    const { name, description, status, addMemberUsername, removeMemberUserId } = body
+    const { name, description, status, addMemberUsername, removeMemberUserId, changeMemberRoleUserId, newRole } = body
 
-    // 1. Handle add member by username
+    // 1. Handle member role change
+    if (changeMemberRoleUserId && newRole) {
+      const proj = await prisma.project.findUnique({
+        where: { id },
+        include: {
+          admins: { select: { id: true } },
+          managers: { select: { id: true } }
+        }
+      })
+
+      if (!proj) {
+        return Response.json({ error: "Project not found" }, { status: 404 })
+      }
+
+      const isCallerAdmin = proj.creatorId === session.user.id || proj.admins.some((a) => a.id === session.user.id)
+      const isCallerManager = proj.managers.some((m) => m.id === session.user.id)
+
+      if (!isCallerAdmin && !isCallerManager) {
+        return Response.json({ error: "Forbidden: Only admins and managers can change roles" }, { status: 403 })
+      }
+
+      if (proj.creatorId === changeMemberRoleUserId) {
+        return Response.json({ error: "Cannot change the role of the project creator" }, { status: 400 })
+      }
+
+      const isTargetAdmin = proj.admins.some((a) => a.id === changeMemberRoleUserId)
+      if (isCallerManager && (newRole === "admin" || isTargetAdmin)) {
+        return Response.json({ error: "Forbidden: Managers cannot promote to Admin or modify Admin roles" }, { status: 403 })
+      }
+
+      // Disconnect from current role lists
+      await prisma.project.update({
+        where: { id },
+        data: {
+          admins: { disconnect: { id: changeMemberRoleUserId } },
+          managers: { disconnect: { id: changeMemberRoleUserId } }
+        }
+      })
+
+      let roleUpdate = {}
+      if (newRole === "admin") {
+        roleUpdate = { admins: { connect: { id: changeMemberRoleUserId } } }
+      } else if (newRole === "manager") {
+        roleUpdate = { managers: { connect: { id: changeMemberRoleUserId } } }
+      }
+
+      const updated = await prisma.project.update({
+        where: { id },
+        data: roleUpdate,
+        include: {
+          members: { select: { id: true, username: true } },
+          admins: { select: { id: true, username: true } },
+          managers: { select: { id: true, username: true } }
+        }
+      })
+      return Response.json(updated)
+    }
+
+    // 2. Handle add member by username
     if (addMemberUsername) {
       const user = await prisma.user.findUnique({
         where: { username: addMemberUsername },
@@ -59,15 +140,15 @@ export async function PATCH(req, { params }) {
           },
         },
         include: {
-          members: {
-            select: { id: true, username: true },
-          },
+          members: { select: { id: true, username: true } },
+          admins: { select: { id: true, username: true } },
+          managers: { select: { id: true, username: true } }
         },
       })
       return Response.json(updated)
     }
 
-    // 2. Handle remove member by user ID
+    // 3. Handle remove member by user ID
     if (removeMemberUserId) {
       const updated = await prisma.project.update({
         where: { id },
@@ -75,17 +156,23 @@ export async function PATCH(req, { params }) {
           members: {
             disconnect: { id: removeMemberUserId },
           },
+          admins: {
+            disconnect: { id: removeMemberUserId },
+          },
+          managers: {
+            disconnect: { id: removeMemberUserId },
+          },
         },
         include: {
-          members: {
-            select: { id: true, username: true },
-          },
+          members: { select: { id: true, username: true } },
+          admins: { select: { id: true, username: true } },
+          managers: { select: { id: true, username: true } }
         },
       })
       return Response.json(updated)
     }
 
-    // 3. Handle general project updates (name, description, status)
+    // 4. Handle general project updates (name, description, status)
     const updateData = {}
     if (name !== undefined) {
       if (!name.trim()) {
@@ -104,12 +191,9 @@ export async function PATCH(req, { params }) {
       where: { id },
       data: updateData,
       include: {
-        members: {
-          select: {
-            id: true,
-            username: true,
-          },
-        },
+        members: { select: { id: true, username: true } },
+        admins: { select: { id: true, username: true } },
+        managers: { select: { id: true, username: true } }
       },
     })
 
@@ -128,6 +212,19 @@ export async function DELETE(req, { params }) {
 
     const resolvedParams = await params
     const id = resolvedParams.id
+
+    const project = await prisma.project.findUnique({
+      where: { id },
+      select: { creatorId: true }
+    })
+
+    if (!project) {
+      return Response.json({ error: "Project not found" }, { status: 404 })
+    }
+
+    if (project.creatorId && project.creatorId !== session.user.id) {
+      return Response.json({ error: "Only the creator can delete this project." }, { status: 403 })
+    }
 
     await prisma.project.delete({
       where: { id },

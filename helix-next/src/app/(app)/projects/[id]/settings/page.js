@@ -14,6 +14,7 @@ import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import PersonRemoveRoundedIcon from "@mui/icons-material/PersonRemoveRounded";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
+import CircularProgress from "@mui/material/CircularProgress";
 
 export default function ProjectSettingsPage({ params }) {
   const resolvedParams = use(params);
@@ -43,6 +44,12 @@ export default function ProjectSettingsPage({ params }) {
   // Tabs and Responsive States
   const [activeTab, setActiveTab] = useState("general"); // "general" or "members"
   const [mobileShowActions, setMobileShowActions] = useState(false);
+
+  // Role permissions
+  const isCreator = project?.creatorId === session?.user?.id;
+  const isAdmin = isCreator || project?.admins?.some((u) => u.id === session?.user?.id);
+  const isManager = project?.managers?.some((u) => u.id === session?.user?.id);
+  const canManageRoles = isAdmin || isManager;
 
   // Redirect if unauthenticated
   useEffect(() => {
@@ -164,6 +171,24 @@ export default function ProjectSettingsPage({ params }) {
 
       setProject(data);
       showToast("Member removed successfully", "success");
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  };
+
+  // Handle Change Member Role
+  const handleChangeRole = async (memberId, newRole) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changeMemberRoleUserId: memberId, newRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update member role.");
+
+      setProject(data);
+      showToast("Role updated successfully", "success");
     } catch (err) {
       showToast(err.message, "error");
     }
@@ -439,39 +464,41 @@ export default function ProjectSettingsPage({ params }) {
               </div>
 
               {/* Member Add Form */}
-              <form onSubmit={handleAddMember} className="space-y-3">
-                <label className="block text-sm font-semibold text-[var(--text-primary)]">
-                  Add Member
-                </label>
-                {memberError && (
-                  <p className="text-xs text-red-500 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
-                    {memberError}
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={memberInput}
-                    onChange={(e) => setMemberInput(e.target.value)}
-                    placeholder="Enter user's exact username"
-                    className="flex-1 rounded-2xl border border-[var(--border-color)] bg-transparent px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-[var(--text-primary)]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={memberLoading}
-                    className="flex items-center gap-1.5 rounded-2xl bg-[var(--accent)] px-5 py-2 hover:opacity-90 text-white font-semibold transition active:scale-95 text-sm cursor-pointer disabled:opacity-50"
-                  >
-                    {memberLoading ? (
-                      <CircularProgress size={16} color="inherit" />
-                    ) : (
-                      <>
-                        <PersonAddRoundedIcon fontSize="small" />
-                        Add
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
+              {canManageRoles && (
+                <form onSubmit={handleAddMember} className="space-y-3">
+                  <label className="block text-sm font-semibold text-[var(--text-primary)]">
+                    Add Member
+                  </label>
+                  {memberError && (
+                    <p className="text-xs text-red-500 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
+                      {memberError}
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={memberInput}
+                      onChange={(e) => setMemberInput(e.target.value)}
+                      placeholder="Enter user's exact username"
+                      className="flex-1 rounded-2xl border border-[var(--border-color)] bg-transparent px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-[var(--text-primary)]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={memberLoading}
+                      className="flex items-center gap-1.5 rounded-2xl bg-[var(--accent)] px-5 py-2 hover:opacity-90 text-white font-semibold transition active:scale-95 text-sm cursor-pointer disabled:opacity-50"
+                    >
+                      {memberLoading ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : (
+                        <>
+                          <PersonAddRoundedIcon fontSize="small" />
+                          Add
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {/* Current Members List */}
               <div className="space-y-3">
@@ -481,6 +508,15 @@ export default function ProjectSettingsPage({ params }) {
                 <div className="divide-y divide-[var(--border-color)] rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] p-2">
                   {project?.members?.map((m) => {
                     const isSelf = m.id === session?.user?.id;
+                    const isCreatorMember = m.id === project?.creatorId;
+                    const isTargetAdmin = project?.admins?.some((u) => u.id === m.id);
+                    const isTargetManager = project?.managers?.some((u) => u.id === m.id);
+                    const currentRole = isCreatorMember ? "creator" : isTargetAdmin ? "admin" : isTargetManager ? "manager" : "member";
+                    
+                    const canEditThisTargetRole = 
+                      !isCreatorMember && 
+                      (isAdmin ? true : (isManager && currentRole === "member"));
+
                     return (
                       <div key={m.id} className="flex items-center justify-between p-3 first:pt-2 last:pb-2">
                         <div className="flex items-center gap-2">
@@ -499,16 +535,37 @@ export default function ProjectSettingsPage({ params }) {
                           </div>
                         </div>
 
-                        {/* Disconnect/Remove Action */}
-                        {!isSelf && (
-                          <button
-                            onClick={() => handleRemoveMember(m.id)}
-                            className="rounded-lg p-1.5 text-red-500 hover:bg-red-500/10 transition cursor-pointer"
-                            title={`Remove ${m.username}`}
-                          >
-                            <PersonRemoveRoundedIcon fontSize="small" />
-                          </button>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {/* Role Indicator / Dropdown */}
+                          {canManageRoles ? (
+                            <select
+                              value={currentRole}
+                              disabled={!canEditThisTargetRole}
+                              onChange={(e) => handleChangeRole(m.id, e.target.value)}
+                              className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                              <option value="creator" disabled>Creator / Admin</option>
+                              <option value="admin" disabled={isManager}>Admin</option>
+                              <option value="manager">Manager</option>
+                              <option value="member">Member</option>
+                            </select>
+                          ) : (
+                            <span className="text-xs font-bold text-[var(--text-secondary)] border border-[var(--border-color)] px-2 py-0.5 rounded-lg bg-[var(--bg-card)] capitalize">
+                              {currentRole === "creator" ? "Creator / Admin" : currentRole}
+                            </span>
+                          )}
+
+                          {/* Disconnect/Remove Action */}
+                          {!isSelf && !isCreatorMember && (isAdmin || (isManager && currentRole === "member")) && (
+                            <button
+                              onClick={() => handleRemoveMember(m.id)}
+                              className="rounded-lg p-1.5 text-red-500 hover:bg-red-500/10 transition cursor-pointer"
+                              title={`Remove ${m.username}`}
+                            >
+                              <PersonRemoveRoundedIcon fontSize="small" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

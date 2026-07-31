@@ -82,12 +82,13 @@ export async function GET() {
       })
     }
 
-    // 3. Query projects list user is member of
+    // 3. Query projects list user is member of or creator of
     const projects = await prisma.project.findMany({
       where: {
-        members: {
-          some: { id: userId },
-        },
+        OR: [
+          { creatorId: userId },
+          { members: { some: { id: userId } } }
+        ]
       },
       select: {
         id: true,

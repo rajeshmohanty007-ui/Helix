@@ -35,6 +35,9 @@ model User {
   createdEvents     CalendarEvent[]    @relation("EventCreator")
   assignedEvents    CalendarEvent[]    @relation("EventAssignees")
   projects          Project[]          @relation("ProjectMembers")
+  createdProjects   Project[]          @relation("ProjectCreator")
+  adminProjects     Project[]          @relation("ProjectAdmins")
+  managerProjects   Project[]          @relation("ProjectManagers")
   objectives        ProjectObjective[] @relation("ObjectiveMembers")
 }
 
@@ -46,8 +49,13 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  creatorId   String?
+  creator     User?    @relation("ProjectCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+
   // Relationships
   members    User[]             @relation("ProjectMembers")
+  admins     User[]             @relation("ProjectAdmins")
+  managers   User[]             @relation("ProjectManagers")
   updates    ProjectUpdate[]
   objectives ProjectObjective[]
   channels   Channel[]

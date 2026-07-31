@@ -25,9 +25,14 @@ export async function GET() {
       take: 15,
     })
 
-    // 3. Fetch Projects that user belongs to, then retrieve their RecentActivity updates
+    // 3. Fetch Projects that user belongs to or created, then retrieve their RecentActivity updates
     const projects = await prisma.project.findMany({
-      where: { members: { some: { id: userId } } },
+      where: {
+        OR: [
+          { creatorId: userId },
+          { members: { some: { id: userId } } }
+        ]
+      },
       select: { id: true },
     })
     
@@ -44,26 +49,47 @@ export async function GET() {
 
     // Map tasks
     tasks.forEach((t) => {
-      notifications.push({
-        id: `task-${t.id}`,
-        type: "task",
-        title: `Task Deadline Alert`,
-        message: `Task: "${t.title}" is due on ${t.deadline}. Priority: ${t.priority}`,
-        createdAt: t.createdAt,
-        actionUrl: "/tasks",
-      })
+      if (t.deadline && t.deadline !== "No deadline") {
+        const deadlineDate = new Date(t.deadline)
+        if (!isNaN(deadlineDate.getTime())) {
+          const oneDayBefore = deadlineDate.getTime() - 24 * 60 * 60 * 1000
+          if (Date.now() >= oneDayBefore) {
+            notifications.push({
+              id: `task-${t.id}`,
+              type: "task",
+              title: `Task Deadline Alert`,
+              message: `Task: "${t.title}" is due on ${t.deadline}. Priority: ${t.priority}`,
+              createdAt: t.createdAt,
+              actionUrl: "/tasks",
+            })
+          }
+        }
+      }
     })
 
     // Map events
     events.forEach((e) => {
-      notifications.push({
-        id: `event-${e.id}`,
-        type: "event",
-        title: `Calendar Event Reminders`,
-        message: `Event: "${e.title}" is scheduled on ${new Date(e.date).toLocaleDateString()} at ${e.startTime} - ${e.endTime}.`,
-        createdAt: e.date,
-        actionUrl: "/calendar",
-      })
+      if (e.date && e.startTime) {
+        const eventDate = new Date(e.date)
+        const y = eventDate.getUTCFullYear()
+        const m = eventDate.getUTCMonth()
+        const d = eventDate.getUTCDate()
+        
+        const [hours, minutes] = e.startTime.split(":").map(Number)
+        const eventStart = new Date(y, m, d, hours || 0, minutes || 0, 0)
+        
+        const tenMinBefore = eventStart.getTime() - 10 * 60 * 1000
+        if (Date.now() >= tenMinBefore) {
+          notifications.push({
+            id: `event-${e.id}`,
+            type: "event",
+            title: `Calendar Event Reminders`,
+            message: `Event: "${e.title}" is scheduled on ${new Date(e.date).toLocaleDateString()} at ${e.startTime} - ${e.endTime}.`,
+            createdAt: e.date,
+            actionUrl: "/calendar",
+          })
+        }
+      }
     })
 
     // Map project updates

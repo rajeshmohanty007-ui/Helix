@@ -152,10 +152,15 @@ export default function ChatPage({ params }) {
   // 3. Socket.io setup & room triggers
   const activeTopicRef = useRef(activeTopic?.id);
   const joinedRoomRef = useRef(null);
+  const topicsRef = useRef(topics);
 
   useEffect(() => {
     activeTopicRef.current = activeTopic?.id;
   }, [activeTopic?.id]);
+
+  useEffect(() => {
+    topicsRef.current = topics;
+  }, [topics]);
 
   // Handle single socket connection lifecycle
   useEffect(() => {
@@ -163,20 +168,26 @@ export default function ChatPage({ params }) {
 
     let socket;
     const socketInitializer = () => {
-      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
+      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "";
+      const isCustomUrl = !!process.env.NEXT_PUBLIC_SOCKET_URL;
       socket = io(socketUrl, {
-        transports: ["websocket"],
+        path: isCustomUrl ? undefined : "/api/socket",
+        transports: ["polling", "websocket"],
       });
 
       socketRef.current = socket;
 
       socket.on("connect", () => {
-        console.log("Socket client connected");
+        console.log("Socket client connected successfully. ID:", socket.id);
         if (activeTopicRef.current) {
           const roomName = `channel_${activeTopicRef.current}`;
           socket.emit("join-room", roomName);
           joinedRoomRef.current = roomName;
         }
+      });
+
+      socket.on("connect_error", (err) => {
+        console.error("Socket client connection error details:", err.message, err);
       });
 
       // Receive new message
@@ -185,6 +196,16 @@ export default function ChatPage({ params }) {
           setMessages((prev) => {
             if (prev.some((m) => m.id === message.id)) return prev;
             return [...prev, message];
+          });
+        }
+
+        // Browser push notification if from another user
+        if (message.senderId !== currentUser?.id && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+          const matchedTopic = topicsRef.current.find((t) => t.id === message.channelId);
+          const topicName = matchedTopic ? matchedTopic.name : "chat";
+          new Notification(`#${topicName}`, {
+            body: `${message.sender?.username || "Someone"}: ${message.text}`,
+            icon: "/helix_logo.svg",
           });
         }
 
@@ -214,8 +235,8 @@ export default function ChatPage({ params }) {
         );
       });
 
-      socket.on("disconnect", () => {
-        console.log("Socket client disconnected");
+      socket.on("disconnect", (reason) => {
+        console.log("Socket client disconnected. Reason:", reason);
       });
     };
 

@@ -9,15 +9,45 @@ export default function NotificationsTab() {
   const [notifyEvent, setNotifyEvent] = useState(true);
   const [notifySystem, setNotifySystem] = useState(true);
 
-  // Load preferences from localStorage on mount
+  const [permission, setPermission] = useState("default");
+
+  // Load preferences and notification permissions on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       setNotifyTask(localStorage.getItem("notify-task") !== "false");
       setNotifyProject(localStorage.getItem("notify-project") !== "false");
       setNotifyEvent(localStorage.getItem("notify-event") !== "false");
       setNotifySystem(localStorage.getItem("notify-system") !== "false");
+
+      if ("Notification" in window) {
+        setPermission(Notification.permission);
+        if (Notification.permission === "default") {
+          Notification.requestPermission().then((result) => {
+            setPermission(result);
+            if (result === "granted") {
+              new Notification("Helix", {
+                body: "Browser notifications enabled!",
+                icon: "/helix_logo.svg"
+              });
+            }
+          });
+        }
+      }
     }
   }, []);
+
+  const handleEnableNotifications = async () => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      const result = await Notification.requestPermission();
+      setPermission(result);
+      if (result === "granted") {
+        new Notification("Helix", {
+          body: "Browser notifications enabled!",
+          icon: "/helix_logo.svg"
+        });
+      }
+    }
+  };
 
   return (
     <div className="space-y-8 max-w-xl animate-in fade-in duration-200">
@@ -25,6 +55,21 @@ export default function NotificationsTab() {
         <h3 className="text-lg font-bold text-[var(--text-primary)]">Notification Preferences</h3>
         <p className="text-xs text-[var(--text-secondary)]">Turn notification streams on or off for different categories</p>
       </div>
+
+      {permission !== "granted" && (
+        <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4 flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-bold text-yellow-600 dark:text-yellow-500">Browser Notifications Disabled</h4>
+            <p className="text-xs text-[var(--text-secondary)]">Enable desktop notifications to receive instant updates in your browser</p>
+          </div>
+          <button
+            onClick={handleEnableNotifications}
+            className="rounded-xl bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white hover:opacity-90 transition cursor-pointer active:scale-95 shrink-0"
+          >
+            Enable
+          </button>
+        </div>
+      )}
 
       <div className="space-y-4">
         {/* Task Toggle */}

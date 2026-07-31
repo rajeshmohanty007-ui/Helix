@@ -4,7 +4,18 @@ import { authOptions } from "@/lib/auth"
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session || !session.user) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const projects = await prisma.project.findMany({
+      where: {
+        OR: [
+          { creatorId: session.user.id },
+          { members: { some: { id: session.user.id } } }
+        ]
+      },
       include: {
         members: {
           select: {
@@ -12,6 +23,24 @@ export async function GET() {
             username: true,
           },
         },
+        admins: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+        managers: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+        creator: {
+          select: {
+            id: true,
+            username: true,
+          }
+        }
       },
       orderBy: {
         name: "asc",
@@ -75,8 +104,12 @@ export async function POST(req) {
         name: name.trim(),
         description: description?.trim() || null,
         status: "active",
+        creatorId: session.user.id,
         members: {
           connect: memberConnect,
+        },
+        admins: {
+          connect: [{ id: session.user.id }]
         },
         channels: {
           create: [
@@ -90,6 +123,18 @@ export async function POST(req) {
       },
       include: {
         members: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+        admins: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+        managers: {
           select: {
             id: true,
             username: true,

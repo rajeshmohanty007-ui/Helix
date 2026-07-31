@@ -14,7 +14,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetch("/api/dashboard")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 404) {
+            import("next-auth/react").then(({ signOut }) => {
+              signOut({ callbackUrl: "/" });
+            });
+          }
+        }
+        return res.json();
+      })
       .then((data) => {
         setData(data);
         setLoading(false);
@@ -35,10 +44,10 @@ export default function DashboardPage() {
     return <LoadingScreen fullScreen={true} />;
   }
 
-  if (!data) {
+  if (!data || data.error || !data.user) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-(--bg-main)">
-        <p className="text-[var(--text-secondary)] italic">Failed to load dashboard data.</p>
+        <p className="text-[var(--text-secondary)] italic">{data?.error || "Failed to load dashboard data."}</p>
       </div>
     );
   }

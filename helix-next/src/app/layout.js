@@ -16,7 +16,7 @@ export const metadata = {
   openGraph: {
     title: "Helix | Collaboration Reimagined",
     description: "Helix is a modern, high-performance collaboration platform designed to streamline task tracking, projects, and discussions.",
-    url: "https://helix-collab.com",
+    url: "https://helix-azure-six.vercel.app",
     siteName: "Helix",
     images: [
       {

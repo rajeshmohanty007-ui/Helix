@@ -40,7 +40,7 @@ export default function SettingsSidebar({
               }}
               className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition text-sm font-medium cursor-pointer ${
                 isSelected
-                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  ? "text-[var(--text-primary)] hover:bg-[var(--bg-hover)] md:bg-[var(--accent)] md:text-white md:shadow-sm md:hover:bg-[var(--accent)] md:hover:text-white"
                   : "text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
               }`}
             >
