@@ -1,0 +1,4 @@
+- after deleting a task, it's getting stuck on a irrelevant page on mobile. Fix it.
+- when the menu of task card on mobile is opened, on clicking anywhere else on the screen it should close the menu, but right now it's opening the description.
+- In the calander events which are repeating, updating the time or date details should update all the repeating events. Also give an option for stop repeating.
+- sometimes the selected section of sidebar is not in sync with the actual page. Fix it. Just add a safety guard.

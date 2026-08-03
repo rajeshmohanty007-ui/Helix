@@ -92,6 +92,8 @@ const TaskCard = ({
         anchorEl={anchorEl}
         open={open}
         onClose={handleMenuClose}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
         slotProps={{
           paper: {
             sx: {

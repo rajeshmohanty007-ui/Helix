@@ -12,8 +12,8 @@ const Profile = dynamic(() => import("../ui/Profile"), {
 
 const links = [
   {href: "/dashboard", title: "Dashboard",sec:"Home"},
-  {href: "/tasks", title: "Tasks",sec:"proj"},
-  {href: "/projects", title: "Projects",sec:"task"},
+  {href: "/tasks", title: "Tasks",sec:"task"},
+  {href: "/projects", title: "Projects",sec:"proj"},
   {href: "/calendar", title: "Calendar",sec:"cal"},
 ];
 

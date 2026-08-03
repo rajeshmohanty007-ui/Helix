@@ -31,22 +31,23 @@ export default function AddObjectiveModal({ isOpen, onClose, projectId, onObject
   const [loading, setLoading] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    if (isOpen) {
-      // Fetch users list
+    if (isOpen && projectId) {
+      // Fetch project details to get its specific members
       setUsersLoading(true);
-      fetch("/api/users")
+      fetch(`/api/projects/${projectId}`)
         .then((res) => res.json())
         .then((data) => {
-          if (Array.isArray(data)) {
-            setAvailableUsers(data);
+          if (data && Array.isArray(data.members)) {
+            setAvailableUsers(data.members);
           }
         })
-        .catch((err) => console.error("Error loading users:", err))
+        .catch((err) => console.error("Error loading project members:", err))
         .finally(() => setUsersLoading(false));
     }
-  }, [isOpen]);
+  }, [isOpen, projectId]);
 
   if (!isOpen) return null;
 
@@ -57,6 +58,10 @@ export default function AddObjectiveModal({ isOpen, onClose, projectId, onObject
         : [...prev, userId]
     );
   }
+
+  const filteredUsers = availableUsers.filter((user) =>
+    user.username.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -97,6 +102,7 @@ export default function AddObjectiveModal({ isOpen, onClose, projectId, onObject
       setDeadline("");
       setStatus("pending");
       setSelectedUserIds([]);
+      setSearchQuery("");
       if (onObjectiveAdded) onObjectiveAdded(data.objective);
       onClose();
     } catch (err) {
@@ -160,36 +166,6 @@ export default function AddObjectiveModal({ isOpen, onClose, projectId, onObject
             />
           </div>
 
-          {/* Status Select */}
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-[var(--text-primary)]">
-              Initial Status
-            </label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {Object.keys(statusConfig).map((key) => {
-                const conf = statusConfig[key];
-                const Icon = conf.icon;
-                const isSelected = status === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setStatus(key)}
-                    style={{
-                      borderColor: isSelected ? conf.color : "transparent",
-                      color: isSelected ? conf.color : "var(--text-secondary)",
-                      backgroundColor: isSelected ? `${conf.color}15` : "var(--bg-main)",
-                    }}
-                    className="flex flex-col items-center gap-2 rounded-2xl border px-3 py-3 text-center transition hover:bg-opacity-80 active:scale-95"
-                  >
-                    <Icon fontSize="medium" />
-                    <span className="text-xs font-semibold">{conf.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Assignees (Members) */}
           <div>
             <label className="mb-2 block text-sm font-semibold text-[var(--text-primary)]">
@@ -200,30 +176,43 @@ export default function AddObjectiveModal({ isOpen, onClose, projectId, onObject
                 <CircularProgress size={20} />
               </div>
             ) : availableUsers.length === 0 ? (
-              <p className="text-xs text-[var(--text-secondary)] italic">No other users found.</p>
+              <p className="text-xs text-[var(--text-secondary)] italic">No project members found.</p>
             ) : (
-              <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 border border-[var(--border-color)] rounded-2xl">
-                {availableUsers.map((user) => {
-                  const isSelected = selectedUserIds.includes(user.id);
-                  return (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => toggleUserSelection(user.id)}
-                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 ${
-                        isSelected
-                          ? "bg-[var(--accent)] text-white"
-                          : "bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-color)]"
-                      }`}
-                    >
-                      <span className="h-4 w-4 rounded-full bg-white/20 flex items-center justify-center text-[10px]">
-                        {user.username[0].toUpperCase()}
-                      </span>
-                      {user.username}
-                      {isSelected && <span>✓</span>}
-                    </button>
-                  );
-                })}
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Search project members..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border-color)] bg-transparent px-3 py-2.5 text-xs outline-none transition focus:border-[var(--accent)] text-[var(--text-primary)]"
+                />
+                <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 border border-[var(--border-color)] rounded-2xl">
+                  {filteredUsers.length === 0 ? (
+                    <p className="text-xs text-[var(--text-secondary)] italic w-full text-center py-2">No matching members found.</p>
+                  ) : (
+                    filteredUsers.map((user) => {
+                      const isSelected = selectedUserIds.includes(user.id);
+                      return (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => toggleUserSelection(user.id)}
+                          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 ${
+                            isSelected
+                              ? "bg-[var(--accent)] text-white"
+                              : "bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-color)]"
+                          }`}
+                        >
+                          <span className="h-4 w-4 rounded-full bg-white/20 flex items-center justify-center text-[10px]">
+                            {user.username[0].toUpperCase()}
+                          </span>
+                          {user.username}
+                          {isSelected && <span>✓</span>}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>

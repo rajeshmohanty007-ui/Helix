@@ -118,6 +118,7 @@ export default function TasksPage() {
 
   const handleDeleteTask = async (taskId) => {
     await deleteTask(taskId, setTasks, activeTask, setActiveTask);
+    setMobileShowDesc(false);
   };
 
   const handleClearList = async (listName) => {

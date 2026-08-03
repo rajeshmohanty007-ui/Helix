@@ -1,17 +1,20 @@
 import React from "react";
+import Link from "next/link";
 
 const Navbar = ({onReg, onLog}) => {
   return (
     <nav className="fixed top-0 z-50 w-full border-b  border-white/10 bg-[#0b1020]/70 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-10">
-          <h1 className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-3xl font-black text-transparent font-Saira">
-            Helix
-          </h1>
+          <Link href="/">
+            <h1 className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-3xl font-black text-transparent font-Saira cursor-pointer">
+              Helix
+            </h1>
+          </Link>
           <div className="hidden md:flex items-center gap-8 text-sm text-gray-300">
-            <a href="#" className="transition hover:text-white">
+            <Link href="/about" className="transition hover:text-white">
               About
-            </a>
+            </Link>
             <a href="#" className="transition hover:text-white">
               Pricing
             </a>

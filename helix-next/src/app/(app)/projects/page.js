@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 import Card3 from "@/components/ui/Card3";
 import Card4 from "@/components/ui/Card4";
 import Chats from "@/components/projects/Chats";
@@ -21,6 +22,7 @@ export default function ProjectsPage() {
     setMounted(true);
   }, []);
 
+  const { data: session } = useSession();
   const [projects, setProjects] = useState([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [activeProj, setActiveProj] = useState(null);
@@ -112,6 +114,12 @@ export default function ProjectsPage() {
     setObjectives((prev) => [newObjective, ...prev]);
   };
 
+  const handleObjectiveUpdated = (updatedObj) => {
+    setObjectives((prev) =>
+      prev.map((obj) => (obj.id === updatedObj.id ? updatedObj : obj))
+    );
+  };
+
   const handleProjectAdded = (newProject) => {
     setProjects((prev) => [newProject, ...prev]);
     setActiveProj(newProject);
@@ -157,6 +165,9 @@ export default function ProjectsPage() {
   useEffect(() => {
     document.title = "Projects | Helix";
   }, []);
+
+  const isCreator = activeProj?.creatorId === session?.user?.id || activeProj?.creator?.id === session?.user?.id;
+  const isAdmin = isCreator || activeProj?.admins?.some((u) => u.id === session?.user?.id);
 
   return (
     <div className="relative flex h-full flex-1">
@@ -272,13 +283,19 @@ export default function ProjectsPage() {
                     {objectives.slice(0, objectivesLimit).map((obj) => (
                       <Card4
                         key={obj.id}
+                        id={obj.id}
+                        projectId={obj.projectId}
                         title={obj.title}
                         deadline={obj.deadline}
                         status={obj.status}
                         members={obj.members.map((m) => ({
+                          id: m.id,
                           name: m.username,
                           avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${m.username}`,
                         }))}
+                        isAdmin={isAdmin}
+                        projectMembers={activeProj?.members || []}
+                        onObjectiveUpdated={handleObjectiveUpdated}
                       />
                     ))}
                   </div>
@@ -328,6 +345,9 @@ export default function ProjectsPage() {
                   objectives={objectives}
                   loading={objectivesLoading}
                   onAddClick={() => activeProj && setIsObjectiveModalOpen(true)}
+                  isAdmin={isAdmin}
+                  projectMembers={activeProj?.members || []}
+                  onObjectiveUpdated={handleObjectiveUpdated}
                 />
               )}
 

@@ -14,6 +14,7 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
   const [type, setType] = useState("task");
   const [priority, setPriority] = useState("medium");
   const [repeat, setRepeat] = useState("none");
+  const [stopRepeating, setStopRepeating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -41,6 +42,7 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
       setType(eventToEdit.type || "task");
       setPriority(eventToEdit.priority || "medium");
       setRepeat("none");
+      setStopRepeating(false);
     } else {
       setTitle("");
       setDescription("");
@@ -50,6 +52,7 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
       setType("task");
       setPriority("medium");
       setRepeat("none");
+      setStopRepeating(false);
     }
     setError("");
     setShowDeleteScopeSelector(false);
@@ -85,6 +88,7 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
 
       if (eventToEdit) {
         body.id = eventToEdit.id;
+        body.stopRepeating = stopRepeating;
       } else {
         body.repeat = repeat;
       }
@@ -288,8 +292,8 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
               </select>
             </div>
 
-            {/* Repeat (Only for creation) */}
-            {!eventToEdit && (
+            {/* Repeat (Only for creation) / Stop Repeating (Only for editing repeating events) */}
+            {!eventToEdit ? (
               <div>
                 <label className="mb-2 block text-sm font-semibold text-[var(--text-primary)]">
                   Repeat Action
@@ -306,6 +310,21 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
                   <option value="yearly">Yearly</option>
                 </select>
               </div>
+            ) : (
+              eventToEdit.repeatGroupId && (
+                <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
+                  <input
+                    type="checkbox"
+                    id="stopRepeating"
+                    checked={stopRepeating}
+                    onChange={(e) => setStopRepeating(e.target.checked)}
+                    className="accent-[var(--accent)] cursor-pointer h-4 w-4"
+                  />
+                  <label htmlFor="stopRepeating" className="text-sm font-semibold text-[var(--text-primary)] cursor-pointer select-none">
+                    Stop repeating series (Make this a standalone event and delete others)
+                  </label>
+                </div>
+              )
             )}
 
             {/* Button Actions */}

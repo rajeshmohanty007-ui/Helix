@@ -1,12 +1,16 @@
+import Link from "next/link";
+
 const Footer = () => {
   return (
     <footer className="border-t border-white/10 bg-black/20 backdrop-blur-xl">
       <div className="mx-auto grid max-w-7xl gap-12 px-6 py-16 md:grid-cols-4">
         {/* BRAND */}
         <div>
-          <h2 className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-3xl font-black text-transparent">
-            Helix
-          </h2>
+          <Link href="/">
+            <h2 className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-3xl font-black text-transparent cursor-pointer">
+              Helix
+            </h2>
+          </Link>
 
           <p className="mt-4 text-sm leading-relaxed text-gray-400">
             Collaborative productivity platform built for creators, developers,
@@ -39,9 +43,9 @@ const Footer = () => {
             <h3 className="mb-4 text-lg font-semibold">Company</h3>
 
             <div className="space-y-3 text-sm text-gray-400">
-              <p className="transition hover:text-white cursor-pointer">
+              <Link href="/about" className="transition hover:text-white cursor-pointer block">
                 About
-              </p>
+              </Link>
 
               <p className="transition hover:text-white cursor-pointer">
                 Careers

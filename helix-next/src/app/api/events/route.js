@@ -172,33 +172,113 @@ export async function PATCH(req) {
     }
 
     const body = await req.json()
-    const { id, title, description, date, startTime, endTime, type, priority } = body
+    const { id, title, description, date, startTime, endTime, type, priority, stopRepeating } = body
 
     if (!id) {
       return Response.json({ error: "Event ID is required" }, { status: 400 })
     }
 
-    const dateObj = date ? new Date(date + "T00:00:00Z") : undefined
-    const calculatedStatus = dateObj ? getEventStatus(dateObj, startTime || "09:00", endTime || "10:00") : undefined
-
-    const updatedEvent = await prisma.calendarEvent.update({
+    // Retrieve target event first to verify permissions and get recurrence meta
+    const targetEvent = await prisma.calendarEvent.findUnique({
       where: {
         id,
         creatorId: session.user.id,
       },
-      data: {
-        title,
-        description,
-        date: dateObj,
-        startTime,
-        endTime,
-        type,
-        priority,
-        status: calculatedStatus,
-      },
     })
 
-    return Response.json({ success: true, event: updatedEvent })
+    if (!targetEvent) {
+      return Response.json({ error: "Event not found" }, { status: 404 })
+    }
+
+    const dateObj = date ? new Date(date + "T00:00:00Z") : undefined
+    const calculatedStatus = dateObj ? getEventStatus(dateObj, startTime || "09:00", endTime || "10:00") : undefined
+
+    if (targetEvent.repeatGroupId) {
+      if (stopRepeating) {
+        // Delete all other occurrences in the group
+        await prisma.calendarEvent.deleteMany({
+          where: {
+            repeatGroupId: targetEvent.repeatGroupId,
+            id: { not: id },
+            creatorId: session.user.id
+          }
+        })
+
+        // Update target event to stop repeating and stand alone
+        const updatedEvent = await prisma.calendarEvent.update({
+          where: { id, creatorId: session.user.id },
+          data: {
+            title: title !== undefined ? title : targetEvent.title,
+            description: description !== undefined ? description : targetEvent.description,
+            date: dateObj !== undefined ? dateObj : targetEvent.date,
+            startTime: startTime !== undefined ? startTime : targetEvent.startTime,
+            endTime: endTime !== undefined ? endTime : targetEvent.endTime,
+            type: type !== undefined ? type : targetEvent.type,
+            priority: priority !== undefined ? priority : targetEvent.priority,
+            status: calculatedStatus !== undefined ? calculatedStatus : targetEvent.status,
+            repeat: "none",
+            repeatGroupId: null
+          }
+        })
+        return Response.json({ success: true, event: updatedEvent })
+      } else {
+        // Calculate date shift
+        const oldDate = new Date(targetEvent.date)
+        const newDate = dateObj || oldDate
+        const diffTime = newDate.getTime() - oldDate.getTime()
+
+        // Fetch all events in this group
+        const groupEvents = await prisma.calendarEvent.findMany({
+          where: {
+            repeatGroupId: targetEvent.repeatGroupId,
+            creatorId: session.user.id
+          }
+        })
+
+        const updatePromises = groupEvents.map((evt) => {
+          const currentEventDate = new Date(evt.date)
+          const updatedEventDate = new Date(currentEventDate.getTime() + diffTime)
+          const newStatus = getEventStatus(updatedEventDate, startTime || evt.startTime, endTime || evt.endTime)
+
+          return prisma.calendarEvent.update({
+            where: { id: evt.id },
+            data: {
+              title: title !== undefined ? title : evt.title,
+              description: description !== undefined ? description : evt.description,
+              startTime: startTime !== undefined ? startTime : evt.startTime,
+              endTime: endTime !== undefined ? endTime : evt.endTime,
+              type: type !== undefined ? type : evt.type,
+              priority: priority !== undefined ? priority : evt.priority,
+              date: updatedEventDate,
+              status: newStatus
+            }
+          })
+        })
+
+        const results = await prisma.$transaction(updatePromises)
+        const updatedEvent = results.find(r => r.id === id) || results[0]
+        return Response.json({ success: true, event: updatedEvent })
+      }
+    } else {
+      // Normal single event update
+      const updatedEvent = await prisma.calendarEvent.update({
+        where: {
+          id,
+          creatorId: session.user.id,
+        },
+        data: {
+          title: title !== undefined ? title : targetEvent.title,
+          description: description !== undefined ? description : targetEvent.description,
+          date: dateObj !== undefined ? dateObj : targetEvent.date,
+          startTime: startTime !== undefined ? startTime : targetEvent.startTime,
+          endTime: endTime !== undefined ? endTime : targetEvent.endTime,
+          type: type !== undefined ? type : targetEvent.type,
+          priority: priority !== undefined ? priority : targetEvent.priority,
+          status: calculatedStatus !== undefined ? calculatedStatus : targetEvent.status,
+        },
+      })
+      return Response.json({ success: true, event: updatedEvent })
+    }
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 })
   }

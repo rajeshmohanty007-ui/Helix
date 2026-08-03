@@ -3,7 +3,7 @@ import Card4 from "../ui/Card4";
 import CircularProgress from "@mui/material/CircularProgress";
 import SeeMore from "../ui/SeeMore";
 
-const ObjectivesSec = ({ objectives = [], loading = false, onAddClick }) => {
+const ObjectivesSec = ({ objectives = [], loading = false, onAddClick, isAdmin, projectMembers, onObjectiveUpdated }) => {
   const [limit, setLimit] = useState(5);
   return (
     <div className="flex h-full flex-col">
@@ -35,13 +35,19 @@ const ObjectivesSec = ({ objectives = [], loading = false, onAddClick }) => {
               {objectives.slice(0, limit).map((obj) => (
                 <Card4
                   key={obj.id}
+                  id={obj.id}
+                  projectId={obj.projectId}
                   title={obj.title}
                   deadline={obj.deadline}
                   status={obj.status}
                   members={obj.members.map((m) => ({
+                    id: m.id,
                     name: m.username,
                     avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${m.username}`,
                   }))}
+                  isAdmin={isAdmin}
+                  projectMembers={projectMembers}
+                  onObjectiveUpdated={onObjectiveUpdated}
                 />
               ))}
             </div>

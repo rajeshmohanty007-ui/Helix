@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "@/context/ThemeContext";
 import Link from "next/link";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
@@ -15,6 +15,10 @@ import ThemeToggle from "./ThemeToggle";
 
 const Sidebar = ({ collapsed, setCollapsed, sec, onProfileClick }) => {
   const [btn, setBtn] = useState(sec);
+
+  useEffect(() => {
+    setBtn(sec);
+  }, [sec]);
   const { dark, toggleTheme } = useTheme();
   return (
     <div
