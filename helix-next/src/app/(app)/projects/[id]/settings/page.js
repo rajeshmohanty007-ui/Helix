@@ -16,6 +16,20 @@ import PersonRemoveRoundedIcon from "@mui/icons-material/PersonRemoveRounded";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 import CircularProgress from "@mui/material/CircularProgress";
 
+// Debounce Hook helper
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 export default function ProjectSettingsPage({ params }) {
   const resolvedParams = use(params);
   const projectId = resolvedParams.id;
@@ -38,8 +52,39 @@ export default function ProjectSettingsPage({ params }) {
 
   // Member States
   const [memberInput, setMemberInput] = useState("");
+  const [selectedAddRole, setSelectedAddRole] = useState("member");
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [memberError, setMemberError] = useState("");
   const [memberLoading, setMemberLoading] = useState(false);
+
+  const debouncedSearch = useDebounce(memberInput, 300);
+
+  useEffect(() => {
+    if (!debouncedSearch.trim() || debouncedSearch.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    async function fetchSuggestions() {
+      try {
+        const res = await fetch(`/api/users`);
+        const allUsers = await res.json();
+        if (Array.isArray(allUsers)) {
+          const match = allUsers.filter(
+            (u) =>
+              u.username.toLowerCase().includes(debouncedSearch.toLowerCase()) &&
+              !project?.members?.some((m) => m.id === u.id)
+          );
+          setSuggestions(match);
+        }
+      } catch (err) {
+        console.warn("Failed suggestions fetch:", err);
+      }
+    }
+
+    fetchSuggestions();
+  }, [debouncedSearch, project?.members]);
 
   // Tabs and Responsive States
   const [activeTab, setActiveTab] = useState("general"); // "general" or "members"
@@ -136,13 +181,15 @@ export default function ProjectSettingsPage({ params }) {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ addMemberUsername: cleanUsername }),
+        body: JSON.stringify({ addMemberUsername: cleanUsername, addMemberRole: selectedAddRole }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to add member.");
 
       setProject(data);
       setMemberInput("");
+      setSelectedAddRole("member");
+      setSuggestions([]);
     } catch (err) {
       setMemberError(err.message);
     } finally {
@@ -474,18 +521,49 @@ export default function ProjectSettingsPage({ params }) {
                       {memberError}
                     </p>
                   )}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={memberInput}
-                      onChange={(e) => setMemberInput(e.target.value)}
-                      placeholder="Enter user's exact username"
-                      className="flex-1 rounded-2xl border border-[var(--border-color)] bg-transparent px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-[var(--text-primary)]"
-                    />
+                  <div className="flex flex-col gap-2 sm:flex-row relative">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={memberInput}
+                        onFocus={() => setShowSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                        onChange={(e) => setMemberInput(e.target.value)}
+                        placeholder="Enter user's username"
+                        className="w-full rounded-2xl border border-[var(--border-color)] bg-transparent px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-[var(--text-primary)]"
+                      />
+                      {showSuggestions && suggestions.length > 0 && (
+                        <div className="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1 shadow-lg helix-scroll">
+                          {suggestions.map((u) => (
+                            <button
+                              key={u.id}
+                              type="button"
+                              onMouseDown={() => {
+                                setMemberInput(u.username);
+                                setSuggestions([]);
+                              }}
+                              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer"
+                            >
+                              <span>{u.username}</span>
+                              <span className="text-[10px] text-[var(--text-secondary)]">{u.email}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <select
+                      value={selectedAddRole}
+                      onChange={(e) => setSelectedAddRole(e.target.value)}
+                      className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-[var(--text-primary)] cursor-pointer"
+                    >
+                      <option value="member">Member</option>
+                      <option value="manager">Manager</option>
+                      {isAdmin && <option value="admin">Admin</option>}
+                    </select>
                     <button
                       type="submit"
                       disabled={memberLoading}
-                      className="flex items-center gap-1.5 rounded-2xl bg-[var(--accent)] px-5 py-2 hover:opacity-90 text-white font-semibold transition active:scale-95 text-sm cursor-pointer disabled:opacity-50"
+                      className="flex items-center justify-center gap-1.5 rounded-2xl bg-[var(--accent)] px-5 py-3 hover:opacity-90 text-white font-semibold transition active:scale-95 text-sm cursor-pointer disabled:opacity-50"
                     >
                       {memberLoading ? (
                         <CircularProgress size={16} color="inherit" />

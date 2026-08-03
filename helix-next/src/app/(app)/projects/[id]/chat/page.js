@@ -162,6 +162,17 @@ export default function ChatPage({ params }) {
     topicsRef.current = topics;
   }, [topics]);
 
+  // Wake up Render.com socket server if external URL is defined
+  useEffect(() => {
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+    if (socketUrl) {
+      const wakeUrl = socketUrl.replace("ws://", "http://").replace("wss://", "https://");
+      fetch(wakeUrl)
+        .then(() => console.log("Wake-up request sent to Render.com socket server"))
+        .catch((err) => console.warn("Render.com socket server wake-up request error:", err));
+    }
+  }, []);
+
   // Handle single socket connection lifecycle
   useEffect(() => {
     if (!currentUser?.id) return;

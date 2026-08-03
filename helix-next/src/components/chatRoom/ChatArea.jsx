@@ -30,6 +30,29 @@ export default function ChatArea({
   const [showEmojiPicker, setShowEmojiPicker] = useState(null); // stores messageId
   const messagesEndRef = useRef(null);
 
+  const [activeLongPressId, setActiveLongPressId] = useState(null);
+  const touchTimerRef = useRef(null);
+
+  const handleTouchStart = (msgId) => {
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+    touchTimerRef.current = setTimeout(() => {
+      setActiveLongPressId(msgId);
+    }, 600);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+    };
+  }, []);
+
   // Auto scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -310,6 +333,9 @@ export default function ChatArea({
               return (
                 <div
                   key={msg.id}
+                  onTouchStart={() => handleTouchStart(msg.id)}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchMove={handleTouchEnd}
                   className="flex flex-col group relative rounded-2xl hover:bg-black/[0.02] dark:hover:bg-white/[0.02] p-2 transition duration-150 border border-transparent hover:border-(--border-color)"
                 >
                   {/* Reply Quote Header */}
@@ -379,10 +405,15 @@ export default function ChatArea({
                     </div>
                   </div>
 
-                  {/* Hover Actions Toolbar */}
-                  <div className="absolute right-3 -top-3.5 hidden group-hover:flex items-center bg-(--bg-card) border border-(--border-color) rounded-xl shadow-lg px-1 py-0.5 z-20 gap-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {/* Actions Toolbar */}
+                  <div className={`absolute right-3 -top-3.5 items-center bg-(--bg-card) border border-(--border-color) rounded-xl shadow-lg px-1 py-0.5 z-20 gap-0.5 animate-in fade-in slide-in-from-top-1 duration-150 ${
+                    activeLongPressId === msg.id ? "flex" : "hidden group-hover:flex"
+                  }`}>
                     <button
-                      onClick={() => setReplyTo(msg)}
+                      onClick={() => {
+                        setReplyTo(msg);
+                        setActiveLongPressId(null);
+                      }}
                       className="p-1.5 text-(--text-secondary) hover:text-(--accent) hover:bg-(--bg-hover) rounded-lg transition cursor-pointer"
                       title="Reply"
                     >
@@ -405,6 +436,7 @@ export default function ChatArea({
                               onClick={() => {
                                 onAddReaction(msg.id, emoji);
                                 setShowEmojiPicker(null);
+                                setActiveLongPressId(null);
                               }}
                               className="hover:scale-125 transition duration-150 p-1 text-sm cursor-pointer"
                             >
@@ -415,7 +447,10 @@ export default function ChatArea({
                       )}
                     </div>
                     <button
-                      onClick={() => onPinMessage(msg.id)}
+                      onClick={() => {
+                        onPinMessage(msg.id);
+                        setActiveLongPressId(null);
+                      }}
                       className={`p-1.5 hover:bg-(--bg-hover) rounded-lg transition cursor-pointer ${
                         msg.pinned ? "text-[#eab308]" : "text-(--text-secondary) hover:text-[#eab308]"
                       }`}
@@ -424,7 +459,10 @@ export default function ChatArea({
                       <PushPinIcon sx={{ fontSize: 14 }} />
                     </button>
                     <button
-                      onClick={() => onMarkImportant(msg.id)}
+                      onClick={() => {
+                        onMarkImportant(msg.id);
+                        setActiveLongPressId(null);
+                      }}
                       className={`p-1.5 hover:bg-(--bg-hover) rounded-lg transition cursor-pointer ${
                         msg.important ? "text-[#f43f5e]" : "text-(--text-secondary) hover:text-[#f43f5e]"
                       }`}
@@ -433,7 +471,10 @@ export default function ChatArea({
                       <LabelImportantIcon sx={{ fontSize: 14 }} />
                     </button>
                     <button
-                      onClick={() => onMarkDecision(msg.id)}
+                      onClick={() => {
+                        onMarkDecision(msg.id);
+                        setActiveLongPressId(null);
+                      }}
                       className={`p-1.5 hover:bg-(--bg-hover) rounded-lg transition cursor-pointer ${
                         msg.decision ? "text-[#10b981]" : "text-(--text-secondary) hover:text-[#10b981]"
                       }`}
@@ -441,6 +482,16 @@ export default function ChatArea({
                     >
                       <PlaylistAddCheckIcon sx={{ fontSize: 16 }} />
                     </button>
+                    {activeLongPressId === msg.id && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveLongPressId(null)}
+                        className="p-1.5 text-red-500 hover:bg-(--bg-hover) rounded-lg transition cursor-pointer ml-1"
+                        title="Dismiss"
+                      >
+                        <CloseIcon sx={{ fontSize: 14 }} />
+                      </button>
+                    )}
                   </div>
                 </div>
               );

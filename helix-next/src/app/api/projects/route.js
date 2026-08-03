@@ -143,6 +143,31 @@ export async function POST(req) {
       },
     })
 
+    // Create notification activity alerts for each added teammate
+    if (typeof dbUsers !== "undefined" && Array.isArray(dbUsers) && dbUsers.length > 0) {
+      const creator = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { username: true }
+      })
+      const creatorUsername = creator?.username || "Admin"
+
+      const activityPromises = dbUsers
+        .filter((u) => u.id !== session.user.id)
+        .map((u) => {
+          return prisma.recentActivity.create({
+            data: {
+              userId: session.user.id,
+              username: creatorUsername,
+              projectId: project.id,
+              projectName: project.name,
+              action: "added collaborator",
+              description: `@${u.username} joined the project`,
+            },
+          })
+        })
+      await Promise.all(activityPromises)
+    }
+
     return Response.json(project)
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 })

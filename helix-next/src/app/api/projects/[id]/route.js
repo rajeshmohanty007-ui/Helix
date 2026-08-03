@@ -62,8 +62,7 @@ export async function PATCH(req, { params }) {
     const resolvedParams = await params
     const id = resolvedParams.id
 
-    const body = await req.json()
-    const { name, description, status, addMemberUsername, removeMemberUserId, changeMemberRoleUserId, newRole } = body
+    const { name, description, status, addMemberUsername, addMemberRole, removeMemberUserId, changeMemberRoleUserId, newRole } = body
 
     // 1. Handle member role change
     if (changeMemberRoleUserId && newRole) {
@@ -132,19 +131,71 @@ export async function PATCH(req, { params }) {
         return Response.json({ error: `User "${addMemberUsername}" not found.` }, { status: 404 })
       }
 
+      const proj = await prisma.project.findUnique({
+        where: { id },
+        include: {
+          members: { select: { id: true } },
+          admins: { select: { id: true } },
+          managers: { select: { id: true } }
+        }
+      })
+
+      if (!proj) {
+        return Response.json({ error: "Project not found" }, { status: 404 })
+      }
+
+      const isCallerAdmin = proj.creatorId === session.user.id || proj.admins.some((a) => a.id === session.user.id)
+      const isCallerManager = proj.managers.some((m) => m.id === session.user.id)
+
+      if (!isCallerAdmin && !isCallerManager) {
+        return Response.json({ error: "Forbidden: Only admins and managers can add members" }, { status: 403 })
+      }
+
+      if (proj.members.some((m) => m.id === user.id)) {
+        return Response.json({ error: `@${addMemberUsername} is already a member of this project.` }, { status: 400 })
+      }
+
+      const updateData = {
+        members: {
+          connect: { id: user.id },
+        },
+      }
+
+      if (addMemberRole === "admin") {
+        if (isCallerManager) {
+          return Response.json({ error: "Forbidden: Managers cannot add users as Administrators" }, { status: 403 })
+        }
+        updateData.admins = { connect: { id: user.id } }
+      } else if (addMemberRole === "manager") {
+        updateData.managers = { connect: { id: user.id } }
+      }
+
       const updated = await prisma.project.update({
         where: { id },
-        data: {
-          members: {
-            connect: { id: user.id },
-          },
-        },
+        data: updateData,
         include: {
           members: { select: { id: true, username: true } },
           admins: { select: { id: true, username: true } },
           managers: { select: { id: true, username: true } }
         },
       })
+
+      const adder = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { username: true }
+      })
+
+      await prisma.recentActivity.create({
+        data: {
+          userId: session.user.id,
+          username: adder?.username || "Admin",
+          projectId: id,
+          projectName: updated.name,
+          action: "added collaborator",
+          description: `@${user.username} joined the project as ${addMemberRole || "member"}`,
+        }
+      })
+
       return Response.json(updated)
     }
 
