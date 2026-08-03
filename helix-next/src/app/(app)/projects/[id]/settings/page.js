@@ -314,9 +314,8 @@ export default function ProjectSettingsPage({ params }) {
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-md">
         {/* Desktop Sidebar & Mobile tab select (Page 1) */}
         <div
-          className={`h-full w-full flex-col border-r border-[var(--border-color)] bg-[var(--bg-sidebar)] md:flex md:w-[30%] shrink-0 ${
-            mobileShowActions ? "hidden" : "flex"
-          }`}
+          className={`h-full w-full flex-col border-r border-[var(--border-color)] bg-[var(--bg-sidebar)] md:flex md:w-[30%] shrink-0 ${mobileShowActions ? "hidden" : "flex"
+            }`}
         >
           <div className="p-4 border-b border-[var(--border-color)]">
             <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
@@ -334,11 +333,10 @@ export default function ProjectSettingsPage({ params }) {
                     setActiveTab(item.id);
                     setMobileShowActions(true);
                   }}
-                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition text-sm font-medium cursor-pointer ${
-                    isSelected
-                      ? "bg-[var(--accent)] text-white shadow-sm"
-                      : "text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-                  }`}
+                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition text-sm font-medium cursor-pointer ${isSelected
+                    ? "lg:bg-[var(--accent)] text-white shadow-sm"
+                    : "text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                    }`}
                 >
                   <Icon fontSize="small" />
                   {item.label}
@@ -350,9 +348,8 @@ export default function ProjectSettingsPage({ params }) {
 
         {/* Action Content Panel (Page 2 on Mobile) */}
         <div
-          className={`h-full flex-1 flex-col overflow-y-auto p-6 md:flex ${
-            mobileShowActions ? "flex" : "hidden"
-          }`}
+          className={`h-full flex-1 flex-col overflow-y-auto p-6 md:flex ${mobileShowActions ? "flex" : "hidden"
+            }`}
         >
           {/* Mobile Back-to-Categories Navigation */}
           <div className="mb-4 flex items-center md:hidden">
@@ -418,15 +415,14 @@ export default function ProjectSettingsPage({ params }) {
                         key={st}
                         type="button"
                         onClick={() => setProjectStatus(st)}
-                        className={`flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition text-center capitalize cursor-pointer active:scale-95 ${
-                          projectStatus === st
-                            ? st === "active"
-                              ? "border-green-500 bg-green-500/10 text-green-500 font-bold"
-                              : st === "paused"
-                                ? "border-yellow-500 bg-yellow-500/10 text-yellow-500 font-bold"
-                                : "border-blue-500 bg-blue-500/10 text-blue-500 font-bold"
-                            : "border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-                        }`}
+                        className={`flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition text-center capitalize cursor-pointer active:scale-95 ${projectStatus === st
+                          ? st === "active"
+                            ? "border-green-500 bg-green-500/10 text-green-500 font-bold"
+                            : st === "paused"
+                              ? "border-yellow-500 bg-yellow-500/10 text-yellow-500 font-bold"
+                              : "border-blue-500 bg-blue-500/10 text-blue-500 font-bold"
+                          : "border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                          }`}
                       >
                         {st}
                       </button>
@@ -590,9 +586,9 @@ export default function ProjectSettingsPage({ params }) {
                     const isTargetAdmin = project?.admins?.some((u) => u.id === m.id);
                     const isTargetManager = project?.managers?.some((u) => u.id === m.id);
                     const currentRole = isCreatorMember ? "creator" : isTargetAdmin ? "admin" : isTargetManager ? "manager" : "member";
-                    
-                    const canEditThisTargetRole = 
-                      !isCreatorMember && 
+
+                    const canEditThisTargetRole =
+                      !isCreatorMember &&
                       (isAdmin ? true : (isManager && currentRole === "member"));
 
                     return (
