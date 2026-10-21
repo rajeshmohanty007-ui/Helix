@@ -90,17 +90,20 @@ export async function PATCH(req) {
 
     // 4. Validate and handle Password change
     if (newPassword) {
-      if (!currentPassword) {
-        return Response.json({ error: "Current password is required to set a new password" }, { status: 400 })
-      }
       if (newPassword.length < 6) {
         return Response.json({ error: "New password must be at least 6 characters long" }, { status: 400 })
       }
 
-      // Verify current password
-      const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash)
-      if (!isPasswordValid) {
-        return Response.json({ error: "Incorrect current password" }, { status: 400 })
+      if (user.passwordHash) {
+        if (!currentPassword) {
+          return Response.json({ error: "Current password is required to set a new password" }, { status: 400 })
+        }
+
+        // Verify current password
+        const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash)
+        if (!isPasswordValid) {
+          return Response.json({ error: "Incorrect current password" }, { status: 400 })
+        }
       }
 
       // Hash and set new password

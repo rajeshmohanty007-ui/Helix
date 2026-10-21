@@ -9,8 +9,8 @@ export async function loginUser({ username, password }) {
     },
   })
 
-  if (!user) {
-    throw new Error("User not found")
+  if (!user || !user.passwordHash) {
+    throw new Error("Invalid username or password")
   }
 
   const validPassword = await bcrypt.compare(

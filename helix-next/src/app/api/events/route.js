@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
+import {
+  getValidGoogleAccessToken,
+  createGoogleCalendarEvent,
+  updateGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
+} from "@/lib/googleCalendar"
 
 function getEventStatus(eventDateVal, startTime, endTime) {
   const now = new Date()
@@ -136,6 +142,27 @@ export async function POST(req) {
       }
     }
 
+    let googleEventId = null
+    if (repeat === "none") {
+      try {
+        const accessToken = await getValidGoogleAccessToken(session.user.id)
+        if (accessToken) {
+          const gEvt = await createGoogleCalendarEvent(accessToken, {
+            title: body.title,
+            description: body.description,
+            date: dateObj,
+            startTime,
+            endTime,
+          })
+          if (gEvt?.id) {
+            googleEventId = gEvt.id
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to push event to Google Calendar:", err)
+      }
+    }
+
     const eventsData = datesToCreate.map((d) => {
       const calculatedStatus = getEventStatus(d, startTime, endTime)
       return {
@@ -149,6 +176,7 @@ export async function POST(req) {
         status: calculatedStatus,
         repeat,
         repeatGroupId,
+        googleEventId,
         creatorId: session.user.id,
       }
     })
@@ -158,7 +186,7 @@ export async function POST(req) {
       data: eventsData,
     })
 
-    return Response.json({ success: true })
+    return Response.json({ success: true, googleEventId })
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 })
   }
@@ -277,6 +305,25 @@ export async function PATCH(req) {
           status: calculatedStatus !== undefined ? calculatedStatus : targetEvent.status,
         },
       })
+
+      // Sync update with Google Calendar if connected
+      if (targetEvent.googleEventId) {
+        try {
+          const accessToken = await getValidGoogleAccessToken(session.user.id)
+          if (accessToken) {
+            await updateGoogleCalendarEvent(accessToken, targetEvent.googleEventId, {
+              title: title !== undefined ? title : targetEvent.title,
+              description: description !== undefined ? description : targetEvent.description,
+              date: dateObj !== undefined ? dateObj : targetEvent.date,
+              startTime: startTime !== undefined ? startTime : targetEvent.startTime,
+              endTime: endTime !== undefined ? endTime : targetEvent.endTime,
+            })
+          }
+        } catch (err) {
+          console.warn("Failed to sync event update to Google Calendar:", err)
+        }
+      }
+
       return Response.json({ success: true, event: updatedEvent })
     }
   } catch (error) {
@@ -309,6 +356,18 @@ export async function DELETE(req) {
 
     if (!targetEvent) {
       return Response.json({ error: "Event not found" }, { status: 404 })
+    }
+
+    // Delete from Google Calendar if event was synced
+    if (targetEvent.googleEventId) {
+      try {
+        const accessToken = await getValidGoogleAccessToken(session.user.id)
+        if (accessToken) {
+          await deleteGoogleCalendarEvent(accessToken, targetEvent.googleEventId)
+        }
+      } catch (err) {
+        console.warn("Failed to delete event from Google Calendar:", err)
+      }
     }
 
     if (mode === "single" || !targetEvent.repeatGroupId) {

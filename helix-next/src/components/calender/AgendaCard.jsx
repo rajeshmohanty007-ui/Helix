@@ -2,6 +2,7 @@ import React from "react";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import FlagIcon from "@mui/icons-material/Flag";
 import GroupIcon from "@mui/icons-material/Group";
+import GoogleIcon from "../ui/GoogleIcon";
 
 export default function AgendaCard({
   title,
@@ -11,6 +12,7 @@ export default function AgendaCard({
   priority = "medium",
   status = "pending",
   assignees = [],
+  googleEventId,
   onClick,
 }) {
   const typeStyles = {
@@ -57,13 +59,23 @@ export default function AgendaCard({
           </div>
         </div>
 
-        <div
-          className={`
-            rounded-full px-2 py-1 text-[10px] font-medium
-            ${typeStyles[type]}
-          `}
-        >
-          {type}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {googleEventId && (
+            <span
+              title="Synced with Google Calendar"
+              className="flex items-center justify-center rounded-full bg-white/10 p-1 border border-white/10"
+            >
+              <GoogleIcon className="h-3 w-3" />
+            </span>
+          )}
+          <div
+            className={`
+              rounded-full px-2 py-1 text-[10px] font-medium
+              ${typeStyles[type]}
+            `}
+          >
+            {type}
+          </div>
         </div>
       </div>
 

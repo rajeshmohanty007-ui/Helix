@@ -595,13 +595,25 @@ export default function AboutPage() {
 
       {/* Auth Modals */}
       {regVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
-          <RegisterForm onClose={() => setRegVisible(false)} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <RegisterForm
+            onClose={() => setRegVisible(false)}
+            onSwitchToLogin={() => {
+              setRegVisible(false);
+              setLogVisible(true);
+            }}
+          />
         </div>
       )}
       {logVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
-          <LoginForm onClose={() => setLogVisible(false)} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <LoginForm
+            onClose={() => setLogVisible(false)}
+            onSwitchToRegister={() => {
+              setLogVisible(false);
+              setRegVisible(true);
+            }}
+          />
         </div>
       )}
     </main>

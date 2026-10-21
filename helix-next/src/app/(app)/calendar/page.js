@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { signIn } from "next-auth/react";
 import MobMonth from "@/components/calender/MobMonth";
 import MonthCalendar from "@/components/calender/Month";
 import AgendaCard from "@/components/calender/AgendaCard";
@@ -8,6 +9,10 @@ import DayView from "@/components/calender/DayView";
 import AddEventModal from "@/components/calender/AddEventModal";
 import AiSchedulerModal from "@/components/calender/AiSchedulerModal";
 import { getTodayString, formatDateString } from "@/ScriptFunc/calendar";
+import { useToast } from "@/components/providers/ToastProvider";
+import GoogleIcon from "@/components/ui/GoogleIcon";
+import CircularProgress from "@mui/material/CircularProgress";
+import SyncRoundedIcon from "@mui/icons-material/SyncRounded";
 
 export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(getTodayString());
@@ -18,6 +23,12 @@ export default function CalendarPage() {
   const [eventToEdit, setEventToEdit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSchedulerAvailable, setIsSchedulerAvailable] = useState(true);
+
+  // Google Calendar Sync State
+  const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+  const [lastGoogleSync, setLastGoogleSync] = useState(null);
+  const [syncingGoogle, setSyncingGoogle] = useState(false);
+  const { showToast } = useToast();
 
   const fetchData = async () => {
     try {
@@ -39,6 +50,55 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchGoogleStatus = async () => {
+    try {
+      const res = await fetch("/api/calendar/google/sync");
+      const data = await res.json();
+      if (res.ok) {
+        setIsGoogleConnected(Boolean(data.connected));
+        setLastGoogleSync(data.lastSync || null);
+      }
+    } catch (err) {
+      console.warn("Failed to check Google Calendar status:", err);
+    }
+  };
+
+  const handleSyncGoogleCalendar = useCallback(async () => {
+    setSyncingGoogle(true);
+    try {
+      const res = await fetch("/api/calendar/google/sync", {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.code === "NOT_CONNECTED") {
+          setIsGoogleConnected(false);
+          // Prompt user to reconnect
+          signIn("google", { callbackUrl: "/calendar?sync=true" });
+          return;
+        }
+        throw new Error(data.error || "Failed to sync with Google Calendar");
+      }
+
+      setIsGoogleConnected(true);
+      setLastGoogleSync(data.lastSync || new Date().toISOString());
+      showToast(
+        `Google Calendar synced! (${data.pulledCount} imported, ${data.pushedCount} exported)`,
+        "success"
+      );
+      await fetchData();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setSyncingGoogle(false);
+    }
+  }, [showToast]);
+
+  const handleConnectGoogleCalendar = () => {
+    signIn("google", { callbackUrl: "/calendar?sync=true" });
   };
 
   const checkSchedulerAvailability = () => {
@@ -66,12 +126,31 @@ export default function CalendarPage() {
   };
 
   useEffect(() => {
-    fetchData();
-    checkSchedulerAvailability();
+    let isMounted = true;
+    const init = async () => {
+      if (!isMounted) return;
+      await fetchData();
+      await fetchGoogleStatus();
+      checkSchedulerAvailability();
+    };
+    init();
+
+    // Check if redirected from Google OAuth with sync request
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("sync") === "true") {
+        handleSyncGoogleCalendar();
+        // Clean url
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
 
     const interval = setInterval(checkSchedulerAvailability, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [handleSyncGoogleCalendar]);
 
   const selectedDateEvents = events.filter(
     (event) => formatDateString(event.date) === selectedDate
@@ -88,29 +167,78 @@ export default function CalendarPage() {
 
   return (
     <div className="h-full min-h-0 flex-1 relative flex flex-col">
-      {/* AI Task Scheduler Action Bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+      {/* Calendar Action Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
         <div className="flex flex-col">
-          <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-            AI Assist
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+              Calendar Workspace
+            </span>
+            {isGoogleConnected && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Google Synced
+              </span>
+            )}
+          </div>
           <span className="text-xs text-[var(--text-secondary)] hidden sm:inline">
-            Optimize your tasks and calendar into a balanced weekly plan
+            Plan schedules, sync events, and organize your productivity
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          {!isSchedulerAvailable && (
-            <span className="text-[11px] text-[var(--text-secondary)] italic">
-              Available tomorrow after 4:00 AM
-            </span>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Google Calendar Sync Button */}
+          {isGoogleConnected ? (
+            <button
+              onClick={handleSyncGoogleCalendar}
+              disabled={syncingGoogle}
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white/5 hover:bg-white/10 border border-[var(--border-color)] hover:border-violet-500/40 text-[var(--text-primary)] rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
+              title={
+                lastGoogleSync
+                  ? `Last synced: ${new Date(lastGoogleSync).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}`
+                  : "Sync with Google Calendar"
+              }
+            >
+              {syncingGoogle ? (
+                <>
+                  <CircularProgress size={16} color="inherit" />
+                  <span>Syncing...</span>
+                </>
+              ) : (
+                <>
+                  <GoogleIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sync Google Calendar</span>
+                  <span className="sm:hidden">Sync</span>
+                  <SyncRoundedIcon sx={{ fontSize: 16 }} className="text-[var(--text-secondary)]" />
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={handleConnectGoogleCalendar}
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white/5 hover:bg-white/10 border border-[var(--border-color)] hover:border-violet-500/40 text-[var(--text-primary)] rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer active:scale-95 shadow-xs"
+              title="Connect your Google Calendar to synchronize events"
+            >
+              <GoogleIcon className="h-4 w-4" />
+              <span>Connect Google Calendar</span>
+            </button>
           )}
+
+          {/* AI Task Scheduler */}
           <button
             onClick={() => setIsAiModalOpen(true)}
             disabled={!isSchedulerAvailable}
-            className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent)]/95 disabled:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 shadow-sm cursor-pointer"
-            title={!isSchedulerAvailable ? "You can run the scheduler once a day. Refresh at 4:00 AM." : "Optimize schedule with AI"}
+            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-[var(--accent)] hover:bg-[var(--accent)]/95 disabled:bg-[var(--border-color)] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+            title={
+              !isSchedulerAvailable
+                ? "You can run the scheduler once a day. Refresh at 4:00 AM."
+                : "Optimize schedule with AI"
+            }
           >
-            <span>🧠 AI Task Scheduler</span>
+            <span>🧠 AI Scheduler</span>
           </button>
         </div>
       </div>
@@ -192,6 +320,7 @@ export default function CalendarPage() {
                   type={event.type}
                   priority={event.priority}
                   status={event.status}
+                  googleEventId={event.googleEventId}
                   assignees={[]}
                   onClick={() => {
                     setEventToEdit(event);

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import GoogleIcon from "../ui/GoogleIcon";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
@@ -227,9 +228,16 @@ export default function DayView({
                 }}
               >
                 <div className="min-w-0">
-                  <h3 className="font-semibold text-white truncate text-sm">
-                    {event.title}
-                  </h3>
+                  <div className="flex items-center gap-1.5">
+                    {event.googleEventId && (
+                      <span title="Synced with Google Calendar" className="shrink-0 flex items-center">
+                        <GoogleIcon className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                    <h3 className="font-semibold text-white truncate text-sm">
+                      {event.title}
+                    </h3>
+                  </div>
                   {event.description && (
                     <p className="text-[11px] text-white/80 line-clamp-2 mt-0.5">
                       {event.description}

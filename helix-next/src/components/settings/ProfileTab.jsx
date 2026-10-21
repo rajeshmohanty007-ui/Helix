@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import CircularProgress from "@mui/material/CircularProgress";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import { signIn } from "next-auth/react";
 import { saveProfile, savePassword } from "@/ScriptFunc/settings";
+import GoogleIcon from "../ui/GoogleIcon";
+import { useToast } from "../providers/ToastProvider";
 
 export default function ProfileTab({
   initialUsername,
@@ -12,6 +15,48 @@ export default function ProfileTab({
   setProfileError: setParentProfileError,
   updateSession,
 }) {
+  const { showToast } = useToast();
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [lastGoogleSync, setLastGoogleSync] = useState(null);
+  const [googleActionLoading, setGoogleActionLoading] = useState(false);
+
+  useEffect(() => {
+    async function checkGoogleStatus() {
+      try {
+        const res = await fetch("/api/calendar/google/sync");
+        const data = await res.json();
+        if (res.ok) {
+          setGoogleConnected(Boolean(data.connected));
+          setLastGoogleSync(data.lastSync);
+        }
+      } catch (err) {
+        console.warn("Failed to check Google status in ProfileTab:", err);
+      }
+    }
+    checkGoogleStatus();
+  }, []);
+
+  const handleDisconnectGoogle = async () => {
+    setGoogleActionLoading(true);
+    try {
+      const res = await fetch("/api/calendar/google/sync", {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setGoogleConnected(false);
+        setLastGoogleSync(null);
+        showToast("Google Calendar disconnected", "success");
+      }
+    } catch (err) {
+      showToast("Failed to disconnect Google Calendar", "error");
+    } finally {
+      setGoogleActionLoading(false);
+    }
+  };
+
+  const handleConnectGoogle = () => {
+    signIn("google", { callbackUrl: "/settings" });
+  };
   const [username, setUsername] = useState(initialUsername || "");
   const [email, setEmail] = useState(initialEmail || "");
   const [profileSaving, setProfileSaving] = useState(false);
@@ -224,6 +269,66 @@ export default function ProfileTab({
           </button>
         </div>
       </form>
+
+      {/* Connected Integrations Section */}
+      <div className="space-y-4 pt-2">
+        <h4 className="text-sm font-semibold border-b border-[var(--border-color)] pb-2 text-[var(--text-primary)]">
+          Connected Services & Integrations
+        </h4>
+
+        <div className="flex items-center justify-between rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/5 border border-white/10 shrink-0">
+              <GoogleIcon className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h5 className="text-sm font-bold text-[var(--text-primary)]">
+                  Google Calendar
+                </h5>
+                {googleConnected && (
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
+                    Connected
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                {googleConnected
+                  ? lastGoogleSync
+                    ? `Last synchronized: ${new Date(lastGoogleSync).toLocaleDateString([], {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}`
+                    : "Synchronizes events bidirectionally with Helix"
+                  : "Connect your Google account to sync calendar schedules"}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            {googleConnected ? (
+              <button
+                type="button"
+                onClick={handleDisconnectGoogle}
+                disabled={googleActionLoading}
+                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition cursor-pointer disabled:opacity-50"
+              >
+                {googleActionLoading ? "Disconnecting..." : "Disconnect"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConnectGoogle}
+                className="rounded-xl bg-violet-600 hover:bg-violet-500 px-4 py-2 text-xs font-semibold text-white transition cursor-pointer shadow-sm"
+              >
+                Connect
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

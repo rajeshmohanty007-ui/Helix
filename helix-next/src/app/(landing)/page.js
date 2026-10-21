@@ -8,16 +8,37 @@ import Footer from "@/components/landing/Footer";
 import RegisterForm from "@/components/landing/RegisterForm";
 import LoginForm from "@/components/landing/LoginForm";
 import LoadingScreen from "@/components/ui/LoadingScreen";
+import { useToast } from "@/components/providers/ToastProvider";
 
 const Home = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { showToast } = useToast();
   const [regVisible, setRegVisible] = useState(false);
   const [logVisible, setLogVisible] = useState(false);
 
   useEffect(() => {
     document.title = "Helix | Collaboration Reimagined";
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const error = params.get("error");
+      if (error) {
+        if (error === "OAuthCallback" || error === "OAuthSignin") {
+          showToast("Google sign in could not be completed. Please try again.", "error");
+        } else if (error === "AccessDenied") {
+          showToast("Google sign in access was denied.", "error");
+        } else {
+          showToast(`Authentication error: ${error}`, "error");
+        }
+        // Clean URL parameter without reloading
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, [showToast]);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -120,15 +141,27 @@ const Home = () => {
           </p>
         </div>
         {regVisible && (
-            <div className="fixed inset-0 z-10 flex items-center justify-center bg-zinc-900/60" >
-              <RegisterForm  onClose={() => setRegVisible(false)}/>
-            </div>
-          )}
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <RegisterForm
+              onClose={() => setRegVisible(false)}
+              onSwitchToLogin={() => {
+                setRegVisible(false);
+                setLogVisible(true);
+              }}
+            />
+          </div>
+        )}
         {logVisible && (
-            <div className="fixed inset-0 z-10 flex items-center justify-center bg-zinc-900/60" >
-              <LoginForm  onClose={() => setLogVisible(false)}/>
-            </div>
-          )}
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <LoginForm
+              onClose={() => setLogVisible(false)}
+              onSwitchToRegister={() => {
+                setLogVisible(false);
+                setRegVisible(true);
+              }}
+            />
+          </div>
+        )}
       </section>
       <Footer />
     </main>

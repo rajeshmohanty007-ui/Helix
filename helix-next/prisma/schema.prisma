@@ -16,7 +16,13 @@ model User {
   username     String   @unique
   email        String   @unique
 
-  passwordHash String
+  passwordHash String?
+  avatar       String?
+
+  googleAccessToken      String?
+  googleRefreshToken     String?
+  googleTokenExpiry      DateTime?
+  lastGoogleCalendarSync DateTime?
 
   role         String   @default("member")
   
@@ -161,6 +167,7 @@ model CalendarEvent {
   status      String   @default("pending") // "completed", "in-progress", "pending"
   repeat      String   @default("none") // "none", "daily", "weekly", "monthly", "yearly"
   repeatGroupId String?
+  googleEventId String?
   
   // Relations
   creatorId   String
