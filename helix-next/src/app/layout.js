@@ -5,6 +5,7 @@ import { DialogProvider } from "@/components/providers/DialogProvider";
 import AuthProvider from "@/components/providers/AuthProvider";
 
 export const metadata = {
+  metadataBase: new URL("https://helix-azure-six.vercel.app"),
   title: {
     default: "Helix | Collaboration Reimagined",
     template: "%s | Helix"

@@ -47,13 +47,17 @@ const Footer = () => {
                 About
               </Link>
 
-              <p className="transition hover:text-white cursor-pointer">
-                Careers
-              </p>
+              <Link href="/privacy" className="transition hover:text-white cursor-pointer block">
+                Privacy Policy
+              </Link>
 
-              <p className="transition hover:text-white cursor-pointer">
+              <Link href="/terms" className="transition hover:text-white cursor-pointer block">
+                Terms of Service
+              </Link>
+
+              <a href="mailto:seraphimcreationverse@gmail.com" className="transition hover:text-white cursor-pointer block">
                 Contact
-              </p>
+              </a>
             </div>
           </div>
 
@@ -83,13 +87,15 @@ const Footer = () => {
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-6 text-sm text-gray-500 md:flex-row">
           <p>© 2026 Helix. All rights reserved.</p>
 
-          <div className="flex gap-6">
-            <p className="cursor-pointer transition hover:text-white">
-              Privacy
-            </p>
+          <nav aria-label="Legal" className="flex gap-6">
+            <Link href="/privacy" className="cursor-pointer transition hover:text-white">
+              Privacy Policy
+            </Link>
 
-            <p className="cursor-pointer transition hover:text-white">Terms</p>
-          </div>
+            <Link href="/terms" className="cursor-pointer transition hover:text-white">
+              Terms of Service
+            </Link>
+          </nav>
         </div>
       </div>
     </footer>
