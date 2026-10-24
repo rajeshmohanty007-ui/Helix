@@ -38,6 +38,9 @@ export const metadata = {
     description: "Helix is a modern, high-performance collaboration platform designed to streamline task tracking, projects, and discussions.",
     images: ["/helix_logo.svg"],
   },
+  verification: {
+    google: "jwHtc4UM9Fkau-ZuBo36ukn5IuC6A1AJu56ZTxG_jrY",
+  }
 };
 
 export default function RootLayout({ children }) {
