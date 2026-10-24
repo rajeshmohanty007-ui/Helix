@@ -1,11 +1,6 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
-import RegisterForm from "@/components/landing/RegisterForm";
-import LoginForm from "@/components/landing/LoginForm";
 import GoogleIcon from "@/components/ui/GoogleIcon";
 import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
@@ -20,12 +15,9 @@ import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 
 export default function PrivacyContent() {
-  const [regVisible, setRegVisible] = useState(false);
-  const [logVisible, setLogVisible] = useState(false);
-
   return (
     <main className="min-h-screen bg-gradient-to-br from-[#0b1020] via-[#151b3b] to-[#1c2942] text-white">
-      <Navbar onReg={() => setRegVisible(true)} onLog={() => setLogVisible(true)} />
+      <Navbar />
 
       {/* Header Banner */}
       <header className="relative mx-auto max-w-5xl px-6 pt-36 pb-12">
@@ -411,30 +403,6 @@ export default function PrivacyContent() {
       </article>
 
       <Footer />
-
-      {/* Auth Modals */}
-      {regVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <RegisterForm
-            onClose={() => setRegVisible(false)}
-            onSwitchToLogin={() => {
-              setRegVisible(false);
-              setLogVisible(true);
-            }}
-          />
-        </div>
-      )}
-      {logVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <LoginForm
-            onClose={() => setLogVisible(false)}
-            onSwitchToRegister={() => {
-              setLogVisible(false);
-              setRegVisible(true);
-            }}
-          />
-        </div>
-      )}
     </main>
   );
 }
