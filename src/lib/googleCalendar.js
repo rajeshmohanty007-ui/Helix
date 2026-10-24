@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { getEventStatus, formatDateString, getTodayString } from "@/ScriptFunc/calendar";
+import {
+  getEventStatus,
+  formatDateString,
+  getTodayString,
+  HARDCODED_OFFSET_MINUTES,
+  HARDCODED_OFFSET_STRING,
+  HARDCODED_TIMEZONE_NAME,
+} from "@/ScriptFunc/calendar";
 import { isRecurrenceStillActive } from "@/lib/recurrence";
 
 /**
@@ -61,6 +68,25 @@ export async function getValidGoogleAccessToken(userId) {
 }
 
 /**
+ * Converts any UTC/ISO datetime from Google Calendar into local date and time string using hardcoded +05:30 offset
+ */
+export function parseGoogleDateTimeToLocal(isoString, offsetMinutes = HARDCODED_OFFSET_MINUTES) {
+  const d = new Date(isoString);
+  const targetTime = new Date(d.getTime() + offsetMinutes * 60 * 1000);
+
+  const y = targetTime.getUTCFullYear();
+  const m = String(targetTime.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(targetTime.getUTCDate()).padStart(2, "0");
+  const dateStr = `${y}-${m}-${day}`;
+
+  const hours = String(targetTime.getUTCHours()).padStart(2, "0");
+  const minutes = String(targetTime.getUTCMinutes()).padStart(2, "0");
+  const timeStr = `${hours}:${minutes}`;
+
+  return { dateStr, timeStr };
+}
+
+/**
  * Format a Helix event into Google Calendar event resource payload
  */
 function toGoogleEventPayload(event) {
@@ -68,18 +94,20 @@ function toGoogleEventPayload(event) {
   const startTime = event.startTime || "09:00";
   const endTime = event.endTime || "10:00";
 
-  // Build ISO-8601 strings
-  const startDateTime = new Date(`${dateStr}T${startTime}:00`).toISOString();
-  const endDateTime = new Date(`${dateStr}T${endTime}:00`).toISOString();
+  // Build ISO-8601 strings with explicit hardcoded +05:30 offset
+  const startDateTime = `${dateStr}T${startTime}:00${HARDCODED_OFFSET_STRING}`;
+  const endDateTime = `${dateStr}T${endTime}:00${HARDCODED_OFFSET_STRING}`;
 
   const payload = {
     summary: event.title,
     description: event.description || "",
     start: {
       dateTime: startDateTime,
+      timeZone: HARDCODED_TIMEZONE_NAME,
     },
     end: {
       dateTime: endDateTime,
+      timeZone: HARDCODED_TIMEZONE_NAME,
     },
   };
 
@@ -253,16 +281,14 @@ export async function syncGoogleCalendar(userId) {
     let endTime = "10:00";
 
     if (gEvt.start?.dateTime) {
-      const startD = new Date(gEvt.start.dateTime);
-      const endD = gEvt.end?.dateTime ? new Date(gEvt.end.dateTime) : startD;
+      const startParts = parseGoogleDateTimeToLocal(gEvt.start.dateTime, HARDCODED_OFFSET_MINUTES);
+      const endParts = gEvt.end?.dateTime
+        ? parseGoogleDateTimeToLocal(gEvt.end.dateTime, HARDCODED_OFFSET_MINUTES)
+        : startParts;
 
-      const y = startD.getFullYear();
-      const m = String(startD.getMonth() + 1).padStart(2, "0");
-      const d = String(startD.getDate()).padStart(2, "0");
-      dateStr = `${y}-${m}-${d}`;
-
-      startTime = `${String(startD.getHours()).padStart(2, "0")}:${String(startD.getMinutes()).padStart(2, "0")}`;
-      endTime = `${String(endD.getHours()).padStart(2, "0")}:${String(endD.getMinutes()).padStart(2, "0")}`;
+      dateStr = startParts.dateStr;
+      startTime = startParts.timeStr;
+      endTime = endParts.timeStr;
     } else if (gEvt.start?.date) {
       // All day event
       dateStr = gEvt.start.date;
