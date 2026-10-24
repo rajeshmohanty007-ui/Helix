@@ -7,64 +7,8 @@ import {
   updateGoogleCalendarEvent,
   deleteGoogleCalendarEvent,
 } from "@/lib/googleCalendar"
-
-function getEventStatus(eventDateVal, startTime, endTime) {
-  const now = new Date()
-  const eventDate = new Date(eventDateVal)
-  
-  const y = eventDate.getUTCFullYear()
-  const m = String(eventDate.getUTCMonth() + 1).padStart(2, "0")
-  const d = String(eventDate.getUTCDate()).padStart(2, "0")
-  const eventDateStr = `${y}-${m}-${d}`
-
-  const todayY = now.getFullYear()
-  const todayM = String(now.getMonth() + 1).padStart(2, "0")
-  const todayD = String(now.getDate()).padStart(2, "0")
-  const todayStr = `${todayY}-${todayM}-${todayD}`
-
-  if (eventDateStr < todayStr) {
-    return "completed"
-  } else if (eventDateStr > todayStr) {
-    return "pending"
-  } else {
-    const currentMinutes = now.getHours() * 60 + now.getMinutes()
-    
-    const parseTimeToMinutes = (timeStr) => {
-      if (!timeStr) return 0
-      const [h, min] = timeStr.split(":").map(Number)
-      return (h || 0) * 60 + (min || 0)
-    }
-
-    const startMinutes = parseTimeToMinutes(startTime)
-    const endMinutes = parseTimeToMinutes(endTime)
-
-    if (currentMinutes < startMinutes) {
-      return "pending"
-    } else if (currentMinutes >= startMinutes && currentMinutes <= endMinutes) {
-      return "in-progress"
-    } else {
-      return "completed"
-    }
-  }
-}
-
-function addDays(date, days) {
-  const result = new Date(date)
-  result.setUTCDate(result.getUTCDate() + days)
-  return result
-}
-
-function addMonths(date, months) {
-  const result = new Date(date)
-  result.setUTCMonth(result.getUTCMonth() + months)
-  return result
-}
-
-function addYears(date, years) {
-  const result = new Date(date)
-  result.setUTCFullYear(result.getUTCFullYear() + years)
-  return result
-}
+import { formatDateString, getEventStatus } from "@/ScriptFunc/calendar"
+import { expandEvents, getRecurrenceRule } from "@/lib/recurrence"
 
 export async function GET(req) {
   try {
@@ -73,22 +17,27 @@ export async function GET(req) {
       return Response.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { searchParams } = new URL(req.url)
+    const startParam = searchParams.get("start")
+    const endParam = searchParams.get("end")
+
     const events = await prisma.calendarEvent.findMany({
       where: {
         creatorId: session.user.id,
       },
       orderBy: [
         { date: "asc" },
-        { startTime: "asc" }
+        { startTime: "asc" },
       ],
     })
 
-    const updatedEvents = events.map(event => ({
-      ...event,
-      status: getEventStatus(event.date, event.startTime, event.endTime)
-    }))
+    // Expand recurring events dynamically into virtual occurrences
+    const expandedEvents = expandEvents(events, {
+      start: startParam ? new Date(startParam) : undefined,
+      end: endParam ? new Date(endParam) : undefined,
+    })
 
-    return Response.json(updatedEvents)
+    return Response.json(expandedEvents)
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 })
   }
@@ -113,80 +62,52 @@ export async function POST(req) {
     const startTime = body.startTime || "09:00"
     const endTime = body.endTime || "10:00"
     const repeat = body.repeat || "none"
-
-    const repeatGroupId = repeat !== "none" ? `group-${Date.now()}-${Math.random().toString(36).substring(2, 9)}` : null
-    const datesToCreate = []
-
-    // Efficient long recurrence ranges (approximating forever)
-    // Daily: 2 years (730 days)
-    // Weekly: 2 years (104 weeks)
-    // Monthly: 5 years (60 months)
-    // Yearly: 10 years (10 years)
-    if (repeat === "none") {
-      datesToCreate.push(dateObj)
-    } else if (repeat === "daily") {
-      for (let i = 0; i < 730; i++) {
-        datesToCreate.push(addDays(dateObj, i))
-      }
-    } else if (repeat === "weekly") {
-      for (let i = 0; i < 104; i++) {
-        datesToCreate.push(addDays(dateObj, i * 7))
-      }
-    } else if (repeat === "monthly") {
-      for (let i = 0; i < 60; i++) {
-        datesToCreate.push(addMonths(dateObj, i))
-      }
-    } else if (repeat === "yearly") {
-      for (let i = 0; i < 10; i++) {
-        datesToCreate.push(addYears(dateObj, i))
-      }
-    }
+    const recurrenceRule = getRecurrenceRule(repeat)
 
     let googleEventId = null
-    if (repeat === "none") {
-      try {
-        const accessToken = await getValidGoogleAccessToken(session.user.id)
-        if (accessToken) {
-          const gEvt = await createGoogleCalendarEvent(accessToken, {
-            title: body.title,
-            description: body.description,
-            date: dateObj,
-            startTime,
-            endTime,
-          })
-          if (gEvt?.id) {
-            googleEventId = gEvt.id
-          }
+
+    // Sync with Google Calendar if connected (works for both single and recurring events natively)
+    try {
+      const accessToken = await getValidGoogleAccessToken(session.user.id)
+      if (accessToken) {
+        const gEvt = await createGoogleCalendarEvent(accessToken, {
+          title: body.title,
+          description: body.description,
+          date: dateObj,
+          startTime,
+          endTime,
+          repeat,
+          recurrenceRule,
+        })
+        if (gEvt?.id) {
+          googleEventId = gEvt.id
         }
-      } catch (err) {
-        console.warn("Failed to push event to Google Calendar:", err)
       }
+    } catch (err) {
+      console.warn("Failed to push event to Google Calendar:", err)
     }
 
-    const eventsData = datesToCreate.map((d) => {
-      const calculatedStatus = getEventStatus(d, startTime, endTime)
-      return {
+    const calculatedStatus = getEventStatus(dateObj, startTime, endTime)
+
+    // Store exactly ONE event in database, containing recurrence rule
+    const newEvent = await prisma.calendarEvent.create({
+      data: {
         title: body.title,
         description: body.description || "",
-        date: d,
+        date: dateObj,
         startTime,
         endTime,
         type: body.type || "task",
         priority: body.priority || "medium",
         status: calculatedStatus,
         repeat,
-        repeatGroupId,
+        recurrenceRule,
         googleEventId,
         creatorId: session.user.id,
-      }
+      },
     })
 
-    // Insert events using createMany in Postgres database for high efficiency
-    await prisma.calendarEvent.createMany({
-      data: eventsData,
-    })
-
-    return Response.json({ success: true, googleEventId })
+    return Response.json({ success: true, event: newEvent, googleEventId })
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 })
   }
@@ -200,13 +121,23 @@ export async function PATCH(req) {
     }
 
     const body = await req.json()
-    const { id, title, description, date, startTime, endTime, type, priority, stopRepeating } = body
+    const {
+      id,
+      title,
+      description,
+      date,
+      startTime,
+      endTime,
+      type,
+      priority,
+      stopRepeating,
+      isOccurrence,
+    } = body
 
     if (!id) {
       return Response.json({ error: "Event ID is required" }, { status: 400 })
     }
 
-    // Retrieve target event first to verify permissions and get recurrence meta
     const targetEvent = await prisma.calendarEvent.findUnique({
       where: {
         id,
@@ -218,114 +149,119 @@ export async function PATCH(req) {
       return Response.json({ error: "Event not found" }, { status: 404 })
     }
 
-    const dateObj = date ? new Date(date + "T00:00:00Z") : undefined
-    const calculatedStatus = dateObj ? getEventStatus(dateObj, startTime || "09:00", endTime || "10:00") : undefined
+    const dateObj = date ? new Date(date + "T00:00:00Z") : targetEvent.date
+    const newStartTime = startTime !== undefined ? startTime : targetEvent.startTime
+    const newEndTime = endTime !== undefined ? endTime : targetEvent.endTime
+    const calculatedStatus = getEventStatus(dateObj, newStartTime, newEndTime)
 
-    if (targetEvent.repeatGroupId) {
-      if (stopRepeating) {
-        // Delete all other occurrences in the group
-        await prisma.calendarEvent.deleteMany({
-          where: {
-            repeatGroupId: targetEvent.repeatGroupId,
-            id: { not: id },
-            creatorId: session.user.id
-          }
-        })
-
-        // Update target event to stop repeating and stand alone
-        const updatedEvent = await prisma.calendarEvent.update({
-          where: { id, creatorId: session.user.id },
-          data: {
-            title: title !== undefined ? title : targetEvent.title,
-            description: description !== undefined ? description : targetEvent.description,
-            date: dateObj !== undefined ? dateObj : targetEvent.date,
-            startTime: startTime !== undefined ? startTime : targetEvent.startTime,
-            endTime: endTime !== undefined ? endTime : targetEvent.endTime,
-            type: type !== undefined ? type : targetEvent.type,
-            priority: priority !== undefined ? priority : targetEvent.priority,
-            status: calculatedStatus !== undefined ? calculatedStatus : targetEvent.status,
-            repeat: "none",
-            repeatGroupId: null
-          }
-        })
-        return Response.json({ success: true, event: updatedEvent })
-      } else {
-        // Calculate date shift
-        const oldDate = new Date(targetEvent.date)
-        const newDate = dateObj || oldDate
-        const diffTime = newDate.getTime() - oldDate.getTime()
-
-        // Fetch all events in this group
-        const groupEvents = await prisma.calendarEvent.findMany({
-          where: {
-            repeatGroupId: targetEvent.repeatGroupId,
-            creatorId: session.user.id
-          }
-        })
-
-        const updatePromises = groupEvents.map((evt) => {
-          const currentEventDate = new Date(evt.date)
-          const updatedEventDate = new Date(currentEventDate.getTime() + diffTime)
-          const newStatus = getEventStatus(updatedEventDate, startTime || evt.startTime, endTime || evt.endTime)
-
-          return prisma.calendarEvent.update({
-            where: { id: evt.id },
-            data: {
-              title: title !== undefined ? title : evt.title,
-              description: description !== undefined ? description : evt.description,
-              startTime: startTime !== undefined ? startTime : evt.startTime,
-              endTime: endTime !== undefined ? endTime : evt.endTime,
-              type: type !== undefined ? type : evt.type,
-              priority: priority !== undefined ? priority : evt.priority,
-              date: updatedEventDate,
-              status: newStatus
-            }
-          })
-        })
-
-        const results = await prisma.$transaction(updatePromises)
-        const updatedEvent = results.find(r => r.id === id) || results[0]
-        return Response.json({ success: true, event: updatedEvent })
-      }
-    } else {
-      // Normal single event update
+    // Case 1: User explicitly converts repeating event to a standalone event
+    if (stopRepeating && targetEvent.repeat !== "none") {
       const updatedEvent = await prisma.calendarEvent.update({
-        where: {
-          id,
-          creatorId: session.user.id,
-        },
+        where: { id, creatorId: session.user.id },
         data: {
           title: title !== undefined ? title : targetEvent.title,
           description: description !== undefined ? description : targetEvent.description,
-          date: dateObj !== undefined ? dateObj : targetEvent.date,
-          startTime: startTime !== undefined ? startTime : targetEvent.startTime,
-          endTime: endTime !== undefined ? endTime : targetEvent.endTime,
+          date: dateObj,
+          startTime: newStartTime,
+          endTime: newEndTime,
           type: type !== undefined ? type : targetEvent.type,
           priority: priority !== undefined ? priority : targetEvent.priority,
-          status: calculatedStatus !== undefined ? calculatedStatus : targetEvent.status,
+          status: calculatedStatus,
+          repeat: "none",
+          recurrenceRule: null,
+          repeatUntil: null,
+          excludedDates: null,
+          repeatGroupId: null,
         },
       })
 
-      // Sync update with Google Calendar if connected
+      // Update in Google Calendar
       if (targetEvent.googleEventId) {
         try {
           const accessToken = await getValidGoogleAccessToken(session.user.id)
           if (accessToken) {
-            await updateGoogleCalendarEvent(accessToken, targetEvent.googleEventId, {
-              title: title !== undefined ? title : targetEvent.title,
-              description: description !== undefined ? description : targetEvent.description,
-              date: dateObj !== undefined ? dateObj : targetEvent.date,
-              startTime: startTime !== undefined ? startTime : targetEvent.startTime,
-              endTime: endTime !== undefined ? endTime : targetEvent.endTime,
-            })
+            await updateGoogleCalendarEvent(accessToken, targetEvent.googleEventId, updatedEvent)
           }
         } catch (err) {
-          console.warn("Failed to sync event update to Google Calendar:", err)
+          console.warn("Failed to update Google Calendar event:", err)
         }
       }
 
       return Response.json({ success: true, event: updatedEvent })
     }
+
+    // Case 2: User edited only a single occurrence of a repeating event
+    if (isOccurrence && targetEvent.repeat !== "none" && date) {
+      const occurrenceDateStr = formatDateString(dateObj)
+      
+      // Add occurrence date to master event's excludedDates
+      let excludedList = []
+      if (targetEvent.excludedDates) {
+        try {
+          excludedList = JSON.parse(targetEvent.excludedDates)
+        } catch {}
+      }
+      if (!excludedList.includes(occurrenceDateStr)) {
+        excludedList.push(occurrenceDateStr)
+        await prisma.calendarEvent.update({
+          where: { id },
+          data: {
+            excludedDates: JSON.stringify(excludedList),
+          },
+        })
+      }
+
+      // Create a standalone override event for this day
+      const standaloneEvent = await prisma.calendarEvent.create({
+        data: {
+          title: title !== undefined ? title : targetEvent.title,
+          description: description !== undefined ? description : targetEvent.description,
+          date: dateObj,
+          startTime: newStartTime,
+          endTime: newEndTime,
+          type: type !== undefined ? type : targetEvent.type,
+          priority: priority !== undefined ? priority : targetEvent.priority,
+          status: calculatedStatus,
+          repeat: "none",
+          repeatGroupId: targetEvent.id, // linked to master
+          creatorId: session.user.id,
+        },
+      })
+
+      return Response.json({ success: true, event: standaloneEvent })
+    }
+
+    // Case 3: Standard update (either non-repeating, or updating the recurring master series)
+    const updatedEvent = await prisma.calendarEvent.update({
+      where: {
+        id,
+        creatorId: session.user.id,
+      },
+      data: {
+        title: title !== undefined ? title : targetEvent.title,
+        description: description !== undefined ? description : targetEvent.description,
+        date: dateObj,
+        startTime: newStartTime,
+        endTime: newEndTime,
+        type: type !== undefined ? type : targetEvent.type,
+        priority: priority !== undefined ? priority : targetEvent.priority,
+        status: calculatedStatus,
+      },
+    })
+
+    // Update in Google Calendar if synced
+    if (targetEvent.googleEventId) {
+      try {
+        const accessToken = await getValidGoogleAccessToken(session.user.id)
+        if (accessToken) {
+          await updateGoogleCalendarEvent(accessToken, targetEvent.googleEventId, updatedEvent)
+        }
+      } catch (err) {
+        console.warn("Failed to update Google Calendar event:", err)
+      }
+    }
+
+    return Response.json({ success: true, event: updatedEvent })
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 })
   }
@@ -341,12 +277,12 @@ export async function DELETE(req) {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
     const mode = searchParams.get("mode") || "single" // "single", "following", "all"
+    const dateParam = searchParams.get("date")
 
     if (!id) {
       return Response.json({ error: "Event ID is required" }, { status: 400 })
     }
 
-    // Retrieve target event first to verify permissions and get recurrence meta
     const targetEvent = await prisma.calendarEvent.findUnique({
       where: {
         id,
@@ -358,38 +294,85 @@ export async function DELETE(req) {
       return Response.json({ error: "Event not found" }, { status: 404 })
     }
 
-    // Delete from Google Calendar if event was synced
-    if (targetEvent.googleEventId) {
-      try {
-        const accessToken = await getValidGoogleAccessToken(session.user.id)
-        if (accessToken) {
-          await deleteGoogleCalendarEvent(accessToken, targetEvent.googleEventId)
-        }
-      } catch (err) {
-        console.warn("Failed to delete event from Google Calendar:", err)
-      }
-    }
+    const isRepeating = targetEvent.repeat && targetEvent.repeat !== "none"
 
-    if (mode === "single" || !targetEvent.repeatGroupId) {
+    if (mode === "all" || !isRepeating) {
+      // Delete Google Calendar event if synced
+      if (targetEvent.googleEventId) {
+        try {
+          const accessToken = await getValidGoogleAccessToken(session.user.id)
+          if (accessToken) {
+            await deleteGoogleCalendarEvent(accessToken, targetEvent.googleEventId)
+          }
+        } catch (err) {
+          console.warn("Failed to delete event from Google Calendar:", err)
+        }
+      }
+
+      // Delete the master event
       await prisma.calendarEvent.delete({
         where: { id },
       })
-    } else if (mode === "all") {
-      await prisma.calendarEvent.deleteMany({
-        where: {
-          repeatGroupId: targetEvent.repeatGroupId,
-          creatorId: session.user.id,
-        },
-      })
-    } else if (mode === "following") {
-      await prisma.calendarEvent.deleteMany({
-        where: {
-          repeatGroupId: targetEvent.repeatGroupId,
-          creatorId: session.user.id,
-          date: {
-            gte: targetEvent.date,
+
+      // Delete any associated overrides or legacy group events
+      if (targetEvent.repeatGroupId || isRepeating) {
+        await prisma.calendarEvent.deleteMany({
+          where: {
+            OR: [
+              { repeatGroupId: id },
+              targetEvent.repeatGroupId ? { repeatGroupId: targetEvent.repeatGroupId } : { id: "none" }
+            ],
+            creatorId: session.user.id,
           },
-        },
+        })
+      }
+    } else if (mode === "single" && isRepeating && dateParam) {
+      // Exclude only this specific occurrence
+      let excludedList = []
+      if (targetEvent.excludedDates) {
+        try {
+          excludedList = JSON.parse(targetEvent.excludedDates)
+        } catch {}
+      }
+
+      if (!excludedList.includes(dateParam)) {
+        excludedList.push(dateParam)
+        await prisma.calendarEvent.update({
+          where: { id },
+          data: {
+            excludedDates: JSON.stringify(excludedList),
+          },
+        })
+      }
+    } else if (mode === "following" && isRepeating && dateParam) {
+      // End recurrence on the day before dateParam
+      const cutoffDate = new Date(dateParam + "T00:00:00Z")
+      cutoffDate.setUTCDate(cutoffDate.getUTCDate() - 1)
+
+      const origDate = new Date(targetEvent.date)
+      if (cutoffDate < origDate) {
+        // Cutoff is before the series started, delete the whole event
+        if (targetEvent.googleEventId) {
+          try {
+            const accessToken = await getValidGoogleAccessToken(session.user.id)
+            if (accessToken) {
+              await deleteGoogleCalendarEvent(accessToken, targetEvent.googleEventId)
+            }
+          } catch (err) {}
+        }
+        await prisma.calendarEvent.delete({ where: { id } })
+      } else {
+        await prisma.calendarEvent.update({
+          where: { id },
+          data: {
+            repeatUntil: cutoffDate,
+          },
+        })
+      }
+    } else {
+      // Default fallback
+      await prisma.calendarEvent.delete({
+        where: { id },
       })
     }
 

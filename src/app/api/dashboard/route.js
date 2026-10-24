@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { recalculateProductivityScore } from "@/lib/dashboard"
+import { expandEvents } from "@/lib/recurrence"
 
 export async function GET() {
   try {
@@ -124,8 +125,9 @@ export async function GET() {
     })
 
     // 7. Upcoming Calendar Events (Today/Future)
-    // Order events by date and select top 3
-    const upcomingEvents = await prisma.calendarEvent.findMany({
+    // Fetch user events and expand recurring instances for the next 30 days
+    const futureWindow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+    const rawEvents = await prisma.calendarEvent.findMany({
       where: {
         OR: [
           { creatorId: userId },
@@ -135,10 +137,14 @@ export async function GET() {
       orderBy: {
         date: "asc",
       },
-      take: 3,
     })
 
-    const formattedEvents = upcomingEvents.map((evt) => ({
+    const expandedUpcoming = expandEvents(rawEvents, {
+      start: now,
+      end: futureWindow,
+    }).slice(0, 3)
+
+    const formattedEvents = expandedUpcoming.map((evt) => ({
       title: evt.title,
       time: `${evt.startTime} - ${evt.endTime} (${new Date(evt.date).toLocaleDateString()})`,
     }))

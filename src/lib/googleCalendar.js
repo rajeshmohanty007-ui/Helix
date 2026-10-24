@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { getEventStatus, formatDateString } from "@/ScriptFunc/calendar";
+import { getEventStatus, formatDateString, getTodayString } from "@/ScriptFunc/calendar";
+import { isRecurrenceStillActive } from "@/lib/recurrence";
 
 /**
  * Ensures a fresh and valid Google Access Token for the user.
@@ -71,7 +72,7 @@ function toGoogleEventPayload(event) {
   const startDateTime = new Date(`${dateStr}T${startTime}:00`).toISOString();
   const endDateTime = new Date(`${dateStr}T${endTime}:00`).toISOString();
 
-  return {
+  const payload = {
     summary: event.title,
     description: event.description || "",
     start: {
@@ -81,6 +82,25 @@ function toGoogleEventPayload(event) {
       dateTime: endDateTime,
     },
   };
+
+  if (event.recurrenceRule) {
+    let rule = event.recurrenceRule;
+    if (event.repeatUntil && !rule.toUpperCase().includes("UNTIL=")) {
+      const untilStr = new Date(event.repeatUntil).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      rule += `;UNTIL=${untilStr}`;
+    }
+    payload.recurrence = [rule];
+  } else if (event.repeat && event.repeat !== "none") {
+    const freq = event.repeat.toUpperCase();
+    let rule = `RRULE:FREQ=${freq}`;
+    if (event.repeatUntil) {
+      const untilStr = new Date(event.repeatUntil).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      rule += `;UNTIL=${untilStr}`;
+    }
+    payload.recurrence = [rule];
+  }
+
+  return payload;
 }
 
 /**
@@ -179,36 +199,41 @@ export async function syncGoogleCalendar(userId) {
     throw new Error("GOOGLE_CALENDAR_NOT_CONNECTED");
   }
 
-  // 1. Fetch events from Google Calendar (from 30 days ago to 1 year ahead)
-  const now = new Date();
-  const timeMinDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const timeMaxDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+  // 1. Fetch all master events from Google Calendar (without restrictive timeMin cutoff so past repeating events are included)
+  const googleEvents = [];
+  let pageToken = null;
 
-  const googleUrl = new URL(
-    "https://www.googleapis.com/calendar/v3/calendars/primary/events"
-  );
-  googleUrl.searchParams.set("singleEvents", "true");
-  googleUrl.searchParams.set("orderBy", "startTime");
-  googleUrl.searchParams.set("timeMin", timeMinDate.toISOString());
-  googleUrl.searchParams.set("timeMax", timeMaxDate.toISOString());
-  googleUrl.searchParams.set("maxResults", "250");
+  do {
+    const googleUrl = new URL(
+      "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+    );
+    googleUrl.searchParams.set("singleEvents", "false");
+    googleUrl.searchParams.set("maxResults", "250");
+    if (pageToken) {
+      googleUrl.searchParams.set("pageToken", pageToken);
+    }
 
-  const gRes = await fetch(googleUrl.toString(), {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+    const gRes = await fetch(googleUrl.toString(), {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-  if (!gRes.ok) {
-    const err = await gRes.json();
-    throw new Error(err?.error?.message || "Failed to fetch Google Calendar events");
-  }
+    if (!gRes.ok) {
+      const err = await gRes.json();
+      throw new Error(err?.error?.message || "Failed to fetch Google Calendar events");
+    }
 
-  const gData = await gRes.json();
-  const googleEvents = gData.items || [];
+    const gData = await gRes.json();
+    if (Array.isArray(gData.items)) {
+      googleEvents.push(...gData.items);
+    }
+    pageToken = gData.nextPageToken;
+  } while (pageToken);
 
   let pulledCount = 0;
   let pushedCount = 0;
+  const todayStr = getTodayString();
 
   // 2. Pull Google events into Helix
   for (const gEvt of googleEvents) {
@@ -247,10 +272,39 @@ export async function syncGoogleCalendar(userId) {
 
     if (!dateStr) continue;
 
+    const isRepeating = Array.isArray(gEvt.recurrence) && gEvt.recurrence.length > 0;
     const eventDate = new Date(dateStr + "T00:00:00Z");
+
+    // Filter rule:
+    // If non-repeating event created in past and has passed: SKIP IT!
+    if (!isRepeating) {
+      if (dateStr < todayStr) {
+        continue;
+      }
+    } else {
+      // If repeating event created in past: only include if STILL repeating!
+      const rawRecurrenceRule = gEvt.recurrence[0];
+      const stillActive = isRecurrenceStillActive(rawRecurrenceRule, eventDate);
+      if (!stillActive) {
+        continue;
+      }
+    }
+
     const status = getEventStatus(eventDate, startTime, endTime);
     const title = gEvt.summary || "Google Calendar Event";
     const description = gEvt.description || "";
+
+    // Parse recurrence rule from Google event
+    let repeat = "none";
+    let recurrenceRule = null;
+    if (isRepeating) {
+      recurrenceRule = gEvt.recurrence[0];
+      const upper = recurrenceRule.toUpperCase();
+      if (upper.includes("FREQ=DAILY")) repeat = "daily";
+      else if (upper.includes("FREQ=WEEKLY")) repeat = "weekly";
+      else if (upper.includes("FREQ=MONTHLY")) repeat = "monthly";
+      else if (upper.includes("FREQ=YEARLY")) repeat = "yearly";
+    }
 
     const existing = await prisma.calendarEvent.findFirst({
       where: {
@@ -268,6 +322,8 @@ export async function syncGoogleCalendar(userId) {
           date: eventDate,
           startTime,
           endTime,
+          repeat,
+          recurrenceRule,
           status,
         },
       });
@@ -282,7 +338,8 @@ export async function syncGoogleCalendar(userId) {
           type: "meeting",
           priority: "medium",
           status,
-          repeat: "none",
+          repeat,
+          recurrenceRule,
           googleEventId: gEvt.id,
           creatorId: userId,
         },
@@ -293,16 +350,37 @@ export async function syncGoogleCalendar(userId) {
   }
 
   // 3. Push unsynced Helix events to Google Calendar
+  // Only push:
+  // - Still repeating events (even if created in the past)
+  // - Active/future non-repeating events (skip passed single events)
   const unsyncedHelixEvents = await prisma.calendarEvent.findMany({
     where: {
       creatorId: userId,
       googleEventId: null,
-      repeat: "none", // Sync single events to prevent duplicating large recurring series
     },
-    take: 50,
   });
 
   for (const hEvt of unsyncedHelixEvents) {
+    const isRepeating = hEvt.repeat && hEvt.repeat !== "none";
+    const hDateStr = formatDateString(hEvt.date);
+
+    if (!isRepeating) {
+      // Skip non-repeating event created in past that has passed
+      if (hDateStr < todayStr) {
+        continue;
+      }
+    } else {
+      // Repeating event: check if still repeating
+      const stillActive = isRecurrenceStillActive(
+        hEvt.recurrenceRule,
+        hEvt.date,
+        hEvt.repeatUntil
+      );
+      if (!stillActive) {
+        continue;
+      }
+    }
+
     const createdGoogleEvt = await createGoogleCalendarEvent(accessToken, hEvt);
     if (createdGoogleEvt?.id) {
       await prisma.calendarEvent.update({

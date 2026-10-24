@@ -2,7 +2,6 @@ import Link from "next/link";
 import Navbar from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
 import GoogleIcon from "@/components/ui/GoogleIcon";
-import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import VerifiedUserRoundedIcon from "@mui/icons-material/VerifiedUserRounded";
 import PolicyRoundedIcon from "@mui/icons-material/PolicyRounded";

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
+import { expandEvents } from "@/lib/recurrence"
 
 export async function POST(req) {
   try {
@@ -55,18 +56,19 @@ export async function POST(req) {
       }
     }
 
-    // 4. Fetch existing calendar events for the next 7 days
+    // 4. Fetch existing calendar events for the next 7 days (including recurring instances)
     const startDate = new Date(dates[0] + "T00:00:00Z")
     const endDate = new Date(dates[6] + "T23:59:59Z")
 
-    const calendarEvents = await prisma.calendarEvent.findMany({
+    const allEvents = await prisma.calendarEvent.findMany({
       where: {
         creatorId: userId,
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
       },
+    })
+
+    const calendarEvents = expandEvents(allEvents, {
+      start: startDate,
+      end: endDate,
     })
 
     // Exclude previously AI-scheduled events from busy slots calculation

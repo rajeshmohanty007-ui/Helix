@@ -87,8 +87,9 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
       };
 
       if (eventToEdit) {
-        body.id = eventToEdit.id;
+        body.id = eventToEdit.baseEventId || eventToEdit.id;
         body.stopRepeating = stopRepeating;
+        body.isOccurrence = Boolean(eventToEdit.isRecurringInstance);
       } else {
         body.repeat = repeat;
       }
@@ -123,7 +124,9 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
     setShowDeleteScopeSelector(false);
 
     try {
-      const res = await fetch(`/api/events?id=${eventToEdit.id}&mode=${mode}`, {
+      const targetId = eventToEdit.baseEventId || eventToEdit.id;
+      const occDate = eventToEdit.date ? formatDateString(eventToEdit.date) : "";
+      const res = await fetch(`/api/events?id=${targetId}&mode=${mode}&date=${occDate}`, {
         method: "DELETE",
       });
 
@@ -145,7 +148,8 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
 
   const handleDeleteClick = async () => {
     if (!eventToEdit) return;
-    if (eventToEdit.repeatGroupId) {
+    const isRepeating = Boolean(eventToEdit.repeat && eventToEdit.repeat !== "none") || Boolean(eventToEdit.repeatGroupId) || Boolean(eventToEdit.isRecurringInstance);
+    if (isRepeating) {
       setShowDeleteScopeSelector(true);
     } else {
       const confirmed = await showConfirm(
@@ -311,7 +315,7 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
                 </select>
               </div>
             ) : (
-              eventToEdit.repeatGroupId && (
+              ((eventToEdit.repeat && eventToEdit.repeat !== "none") || eventToEdit.repeatGroupId || eventToEdit.isRecurringInstance) && (
                 <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
                   <input
                     type="checkbox"
@@ -321,7 +325,7 @@ export default function AddEventModal({ isOpen, onClose, defaultDate, onEventAdd
                     className="accent-[var(--accent)] cursor-pointer h-4 w-4"
                   />
                   <label htmlFor="stopRepeating" className="text-sm font-semibold text-[var(--text-primary)] cursor-pointer select-none">
-                    Stop repeating series (Make this a standalone event and delete others)
+                    Stop repeating series (Make this a standalone event)
                   </label>
                 </div>
               )

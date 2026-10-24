@@ -156,23 +156,26 @@ model Tag {
 }
 
 model CalendarEvent {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  startTime   String
-  endTime     String
-  date        DateTime @default(now())
-  type        String   @default("task") // "task", "deadline", "meeting", "focus"
-  priority    String   @default("medium") // "low", "medium", "high"
-  status      String   @default("pending") // "completed", "in-progress", "pending"
-  repeat      String   @default("none") // "none", "daily", "weekly", "monthly", "yearly"
-  repeatGroupId String?
-  googleEventId String?
+  id             String    @id @default(cuid())
+  title          String
+  description    String?
+  startTime      String
+  endTime        String
+  date           DateTime  @default(now())
+  type           String    @default("task") // "task", "deadline", "meeting", "focus"
+  priority       String    @default("medium") // "low", "medium", "high"
+  status         String    @default("pending") // "completed", "in-progress", "pending"
+  repeat         String    @default("none") // "none", "daily", "weekly", "monthly", "yearly"
+  recurrenceRule String?
+  repeatUntil    DateTime?
+  excludedDates  String?   // JSON array of strings e.g. ["2026-10-25"]
+  repeatGroupId  String?
+  googleEventId  String?
   
   // Relations
-  creatorId   String
-  creator     User     @relation("EventCreator", fields: [creatorId], references: [id])
-  assignees   User[]   @relation("EventAssignees")
+  creatorId      String
+  creator        User      @relation("EventCreator", fields: [creatorId], references: [id])
+  assignees      User[]    @relation("EventAssignees")
 }
 
 model RecentActivity {
