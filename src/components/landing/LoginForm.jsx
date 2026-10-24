@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useToast } from "../providers/ToastProvider"
 
+import Link from "next/link"
 import CloseIcon from "@mui/icons-material/Close"
 import VisibilityIcon from "@mui/icons-material/Visibility"
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff"
@@ -105,6 +106,17 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
           </>
         )}
       </button>
+
+      <p className="mt-2.5 text-center text-[11px] text-[var(--text-secondary)]">
+        By continuing with Google, you agree to Helix&apos;s{" "}
+        <Link href="/terms" className="underline hover:text-white transition">
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="underline hover:text-white transition">
+          Privacy Policy
+        </Link>.
+      </p>
 
       {/* Divider */}
       <div className="relative my-6 flex items-center justify-center">

@@ -4,10 +4,11 @@ export const metadata = {
   metadataBase: new URL("https://helix.seraphimstudio.in"),
   title: "Privacy Policy | Helix - A Product of Seraphim Studio",
   description:
-    "Review Helix's Privacy Policy, including our Google OAuth and Google Calendar Limited Use data disclosures, data security, and user rights. Helix is a product of Seraphim Studio.",
+    "Review Helix's Privacy Policy, including our Google OAuth and Google Calendar Limited Use data disclosures, human access restrictions, data security, and user rights. Helix is a product of Seraphim Studio.",
   keywords: [
     "Helix Privacy Policy",
     "Google Calendar Limited Use",
+    "Google API Services User Data Policy",
     "Data Protection",
     "Helix Security",
     "Seraphim Studio",
@@ -35,7 +36,7 @@ export const metadata = {
     siteName: "Helix by Seraphim Studio",
     type: "article",
     publishedTime: "2026-10-21T00:00:00Z",
-    modifiedTime: "2026-10-23T00:00:00Z",
+    modifiedTime: "2026-10-24T00:00:00Z",
   },
 };
 
@@ -48,7 +49,7 @@ export default function PrivacyPage() {
       "Official Privacy Policy and Google API Limited Use compliance disclosures for the Helix productivity platform, a product of Seraphim Studio.",
     url: "https://helix.seraphimstudio.in/privacy",
     datePublished: "2026-10-21",
-    dateModified: "2026-10-23",
+    dateModified: "2026-10-24",
     inLanguage: "en-US",
     publisher: {
       "@type": "Organization",
@@ -60,7 +61,7 @@ export default function PrivacyPage() {
       "@type": "Article",
       headline: "Helix Privacy Policy & Google API Limited Use Disclosure",
       datePublished: "2026-10-21",
-      dateModified: "2026-10-23",
+      dateModified: "2026-10-24",
       author: {
         "@type": "Organization",
         name: "Seraphim Studio",
