@@ -58,16 +58,48 @@ export async function DELETE() {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Fetch existing tokens before clearing them
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        googleAccessToken: true,
+        googleRefreshToken: true,
+      },
+    });
+
+    const tokenToRevoke = user?.googleRefreshToken || user?.googleAccessToken;
+
+    // Explicitly revoke authorization on Google's servers so it is unlinked from the Google Account
+    if (tokenToRevoke) {
+      try {
+        await fetch(
+          `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(tokenToRevoke)}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          }
+        );
+      } catch (revokeErr) {
+        console.warn("Failed to revoke token on Google servers:", revokeErr);
+      }
+    }
+
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
         googleAccessToken: null,
         googleRefreshToken: null,
         googleTokenExpiry: null,
+        lastGoogleCalendarSync: null,
       },
     });
 
-    return Response.json({ success: true, message: "Google Calendar disconnected." });
+    return Response.json({
+      success: true,
+      message: "Google Calendar disconnected and access revoked.",
+    });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
